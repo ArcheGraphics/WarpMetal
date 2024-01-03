@@ -360,7 +360,7 @@ class Module:
         return hash_recursive(self, visited=set())
 
     def load(self, device):
-        from warp.utils import ScopedTimer
+        from warp.utils.scoped_timer import ScopedTimer
 
         device = get_device(device)
 
