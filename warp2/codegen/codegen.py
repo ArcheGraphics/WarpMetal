@@ -7,9 +7,9 @@ import ctypes
 import re
 from typing import Any, Mapping
 
-from warp import float16, types
-from warp.codegen.var import Var
-from warp.module import builtins
+from warp2 import float16, types
+from warp2.codegen.var import Var
+from warp2.module import builtins
 
 
 def get_annotations(obj: Any) -> Mapping[str, Any]:

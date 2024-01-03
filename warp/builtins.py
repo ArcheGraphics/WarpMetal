@@ -1,13 +1,17 @@
-#  Copyright (c) 2023 Feng Yang
-#
-#  I am making my contributions/submissions to this project solely in my
-#  personal capacity and am not conveying any rights to any intellectual
-#  property of any third parties.
+# Copyright (c) 2022 NVIDIA CORPORATION.  All rights reserved.
+# NVIDIA CORPORATION and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA CORPORATION is strictly prohibited.
 
+import builtins
+from typing import Any, Callable, Tuple
+
+from warp.codegen import Reference
 from warp.types import *
 
-from warp.module.context import add_builtin
-from warp.codegen.reference import Reference
+from .context import add_builtin
 
 
 def sametype_value_func(default):
@@ -1745,14 +1749,14 @@ add_builtin(
     doc="Tests for intersection between two triangles (v0, v1, v2) and (u0, u1, u2) using Moller's method. Returns > 0 if triangles intersect.",
 )
 
-# add_builtin(
-#     "mesh_get",
-#     input_types={"id": uint64},
-#     value_type=Mesh,
-#     missing_grad=True,
-#     group="Geometry",
-#     doc="""Retrieves the mesh given its index.""",
-# )
+add_builtin(
+    "mesh_get",
+    input_types={"id": uint64},
+    value_type=Mesh,
+    missing_grad=True,
+    group="Geometry",
+    doc="""Retrieves the mesh given its index.""",
+)
 
 add_builtin(
     "mesh_eval_face_normal",

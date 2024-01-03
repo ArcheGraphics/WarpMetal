@@ -1,9 +1,8 @@
-# Copyright (c) 2022 NVIDIA CORPORATION.  All rights reserved.
-# NVIDIA CORPORATION and its licensors retain all intellectual property
-# and proprietary rights in and to this software, related documentation
-# and any modifications thereto.  Any use, reproduction, disclosure or
-# distribution of this software and related documentation without an express
-# license agreement from NVIDIA CORPORATION is strictly prohibited.
+#  Copyright (c) 2023 Feng Yang
+#
+#  I am making my contributions/submissions to this project solely in my
+#  personal capacity and am not conveying any rights to any intellectual
+#  property of any third parties.
 
 from __future__ import annotations
 
@@ -17,13 +16,12 @@ from typing import Any, Callable, Generic, List, Tuple, TypeVar, Union
 
 import numpy as np
 
-import warp
+import warp2
 
 # type hints
 Length = TypeVar("Length", bound=int)
 Rows = TypeVar("Rows")
 Cols = TypeVar("Cols")
-DType = TypeVar("DType")
 
 Int = TypeVar("Int")
 Float = TypeVar("Float")
@@ -76,11 +74,11 @@ def constant(x):
 
 
 def float_to_half_bits(value):
-    return warp.context.runtime.core.float_to_half_bits(value)
+    return warp2.context.runtime.core.float_to_half_bits(value)
 
 
 def half_bits_to_float(value):
-    return warp.context.runtime.core.half_bits_to_float(value)
+    return warp2.context.runtime.core.half_bits_to_float(value)
 
 
 # ----------------------
@@ -100,7 +98,7 @@ def vector(length, dtype):
         _shape_ = (_length_,)
         _type_ = ctypes.c_float if dtype in [Scalar, Float] else dtype._type_
 
-        # warp scalar type:
+        # warp2 scalar type:
         _wp_scalar_type_ = dtype
         _wp_type_params_ = [length, dtype]
         _wp_generic_type_str_ = "vec_t"
@@ -175,34 +173,34 @@ def vector(length, dtype):
             return super().__setattr__(name, value)
 
         def __add__(self, y):
-            return warp.add(self, y)
+            return warp2.add(self, y)
 
         def __radd__(self, y):
-            return warp.add(self, y)
+            return warp2.add(self, y)
 
         def __sub__(self, y):
-            return warp.sub(self, y)
+            return warp2.sub(self, y)
 
         def __rsub__(self, x):
-            return warp.sub(x, self)
+            return warp2.sub(x, self)
 
         def __mul__(self, y):
-            return warp.mul(self, y)
+            return warp2.mul(self, y)
 
         def __rmul__(self, x):
-            return warp.mul(x, self)
+            return warp2.mul(x, self)
 
         def __truediv__(self, y):
-            return warp.div(self, y)
+            return warp2.div(self, y)
 
         def __rdiv__(self, x):
-            return warp.div(x, self)
+            return warp2.div(x, self)
 
         def __pos__(self):
-            return warp.pos(self)
+            return warp2.pos(self)
 
         def __neg__(self):
-            return warp.neg(self)
+            return warp2.neg(self)
 
         def __str__(self):
             return f"[{', '.join(map(str, self))}]"
@@ -241,7 +239,7 @@ def matrix(shape, dtype):
         _shape_ = (0, 0) if _length_ == 0 else shape
         _type_ = ctypes.c_float if dtype in [Scalar, Float] else dtype._type_
 
-        # warp scalar type:
+        # warp2 scalar type:
         # used in type checking and when writing out c++ code for constructors:
         _wp_scalar_type_ = dtype
         _wp_type_params_ = [shape[0], shape[1], dtype]
@@ -291,40 +289,40 @@ def matrix(shape, dtype):
                 )
 
         def __add__(self, y):
-            return warp.add(self, y)
+            return warp2.add(self, y)
 
         def __radd__(self, y):
-            return warp.add(self, y)
+            return warp2.add(self, y)
 
         def __sub__(self, y):
-            return warp.sub(self, y)
+            return warp2.sub(self, y)
 
         def __rsub__(self, x):
-            return warp.sub(x, self)
+            return warp2.sub(x, self)
 
         def __mul__(self, y):
-            return warp.mul(self, y)
+            return warp2.mul(self, y)
 
         def __rmul__(self, x):
-            return warp.mul(x, self)
+            return warp2.mul(x, self)
 
         def __matmul__(self, y):
-            return warp.mul(self, y)
+            return warp2.mul(self, y)
 
         def __rmatmul__(self, x):
-            return warp.mul(x, self)
+            return warp2.mul(x, self)
 
         def __truediv__(self, y):
-            return warp.div(self, y)
+            return warp2.div(self, y)
 
         def __rdiv__(self, x):
-            return warp.div(x, self)
+            return warp2.div(x, self)
 
         def __pos__(self):
-            return warp.pos(self)
+            return warp2.pos(self)
 
         def __neg__(self):
-            return warp.neg(self)
+            return warp2.neg(self)
 
         def __str__(self):
             row_str = []
@@ -1044,7 +1042,7 @@ def type_ctype(dtype):
 
 
 def type_length(dtype):
-    if dtype == float or dtype == int or isinstance(dtype, warp.codegen.Struct):
+    if dtype == float or dtype == int or isinstance(dtype, warp2.codegen.Struct):
         return 1
     else:
         return dtype._length_
@@ -1057,7 +1055,7 @@ def type_scalar_type(dtype):
 def type_size_in_bytes(dtype):
     if dtype.__module__ == "ctypes":
         return ctypes.sizeof(dtype)
-    elif isinstance(dtype, warp.codegen.Struct):
+    elif isinstance(dtype, warp2.codegen.Struct):
         return ctypes.sizeof(dtype.ctype)
     elif dtype == float or dtype == int:
         return 4
@@ -1102,7 +1100,7 @@ def type_typestr(dtype):
         return "<i8"
     elif dtype == uint64:
         return "<u8"
-    elif isinstance(dtype, warp.codegen.Struct):
+    elif isinstance(dtype, warp2.codegen.Struct):
         return f"|V{ctypes.sizeof(dtype.ctype)}"
     elif issubclass(dtype, ctypes.Array):
         return type_typestr(dtype._wp_scalar_type_)
@@ -1118,7 +1116,7 @@ def type_repr(t):
         return str(f"vector(length={t._shape_[0]}, dtype={t._wp_scalar_type_})")
     if type_is_matrix(t):
         return str(f"matrix(shape=({t._shape_[0]}, {t._shape_[1]}), dtype={t._wp_scalar_type_})")
-    if isinstance(t, warp.codegen.Struct):
+    if isinstance(t, warp2.codegen.Struct):
         return type_repr(t.cls)
     if t in scalar_types:
         return t.__name__
@@ -1301,7 +1299,7 @@ class array(Array):
 
         Args:
             data (Union[list, tuple, ndarray]) An object to construct the array from, can be a Tuple, List, or generally any type convertible to an np.array
-            dtype (Union): One of the built-in types, e.g.: :class:`warp.mat33`, if dtype is Any and data an ndarray then it will be inferred from the array data type
+            dtype (Union): One of the built-in types, e.g.: :class:`warp2.mat33`, if dtype is Any and data an ndarray then it will be inferred from the array data type
             shape (tuple): Dimensions of the array
             strides (tuple): Number of bytes in each dimension between successive elements of the array
             length (int): Number of elements of the data type (deprecated, users should use `shape` argument)
@@ -1310,7 +1308,7 @@ class array(Array):
             device (Devicelike): Device the array lives on
             copy (bool): Whether the incoming data will be copied or aliased, this is only possible when the incoming `data` already lives on the device specified and types match
             owner (bool): Should the array object try to deallocate memory when it is deleted
-            requires_grad (bool): Whether or not gradients will be tracked for this array, see :class:`warp.Tape` for details
+            requires_grad (bool): Whether or not gradients will be tracked for this array, see :class:`warp2.Tape` for details
             grad (array): The gradient array to use
             pinned (bool): Whether to allocate pinned host memory, which allows asynchronous host-device transfers (only applicable with device="cpu")
 
@@ -1366,7 +1364,7 @@ class array(Array):
                 # allocate gradient if needed
                 self._requires_grad = requires_grad
                 if requires_grad:
-                    with warp.ScopedStream(self.device.null_stream):
+                    with warp2.ScopedStream(self.device.null_stream):
                         self._alloc_grad()
 
     def _init_from_data(self, data, dtype, shape, device, copy, pinned):
@@ -1392,7 +1390,7 @@ class array(Array):
             dtype = np_dtype_to_warp_type.get(arr.dtype)
             if dtype is None:
                 raise RuntimeError(f"Unsupported input data dtype: {arr.dtype}")
-        elif isinstance(dtype, warp.codegen.Struct):
+        elif isinstance(dtype, warp2.codegen.Struct):
             if isinstance(data, np.ndarray):
                 # construct from numpy structured array
                 if data.dtype != dtype.numpy_dtype():
@@ -1422,7 +1420,7 @@ class array(Array):
             npdtype = warp_type_to_np_dtype.get(scalar_dtype)
             if npdtype is None:
                 raise RuntimeError(
-                    f"Failed to convert input data to an array with Warp type {warp.context.type_str(dtype)}"
+                    f"Failed to convert input data to an array with Warp type {warp2.context.type_str(dtype)}"
                 )
             try:
                 arr = np.array(data, dtype=npdtype, copy=False, ndmin=1)
@@ -1446,11 +1444,11 @@ class array(Array):
                 else:
                     if dtype_ndim == 1:
                         raise RuntimeError(
-                            f"The inner dimensions of the input data are not compatible with the requested vector type {warp.context.type_str(dtype)}: expected an inner dimension that is a multiple of {dtype._length_}"
+                            f"The inner dimensions of the input data are not compatible with the requested vector type {warp2.context.type_str(dtype)}: expected an inner dimension that is a multiple of {dtype._length_}"
                         )
                     else:
                         raise RuntimeError(
-                            f"The inner dimensions of the input data are not compatible with the requested matrix type {warp.context.type_str(dtype)}: expected inner dimensions {dtype._shape_} or a multiple of {dtype._length_}"
+                            f"The inner dimensions of the input data are not compatible with the requested matrix type {warp2.context.type_str(dtype)}: expected inner dimensions {dtype._shape_} or a multiple of {dtype._length_}"
                         )
 
         if target_npshape is not None:
@@ -1458,7 +1456,7 @@ class array(Array):
                 arr = arr.reshape(target_npshape)
             except Exception as e:
                 raise RuntimeError(
-                    f"Failed to reshape the input data to the given shape {shape} and type {warp.context.type_str(dtype)}: {e}"
+                    f"Failed to reshape the input data to the given shape {shape} and type {warp2.context.type_str(dtype)}: {e}"
                 )
 
         # determine final shape and strides
@@ -1478,7 +1476,7 @@ class array(Array):
             shape = arr.shape or (1,)
             strides = arr.strides or (type_size_in_bytes(dtype),)
 
-        device = warp.get_device(device)
+        device = warp2.get_device(device)
 
         if device.is_cpu and not copy and not pinned:
             # reference numpy memory directly
@@ -1497,13 +1495,13 @@ class array(Array):
                 copy=False,
                 owner=False,
             )
-            warp.copy(self, src)
+            warp2.copy(self, src)
 
     def _init_from_ptr(self, ptr, dtype, shape, strides, capacity, device, owner, pinned):
         if dtype == Any:
             raise RuntimeError("A concrete data type is required to create the array")
 
-        device = warp.get_device(device)
+        device = warp2.get_device(device)
 
         size = 1
         for d in shape:
@@ -1537,7 +1535,7 @@ class array(Array):
         if dtype == Any:
             raise RuntimeError("A concrete data type is required to create the array")
 
-        device = warp.get_device(device)
+        device = warp2.get_device(device)
 
         size = 1
         for d in shape:
@@ -1593,7 +1591,7 @@ class array(Array):
 
         if self._array_interface is None:
             # get flat shape (including type shape)
-            if isinstance(self.dtype, warp.codegen.Struct):
+            if isinstance(self.dtype, warp2.codegen.Struct):
                 # struct
                 arr_shape = self.shape
                 arr_strides = self.strides
@@ -1791,24 +1789,6 @@ class array(Array):
 
         return self.ctype
 
-    def __matmul__(self, other):
-        """
-        Enables A @ B syntax for matrix multiplication
-        """
-        if self.ndim != 2 or other.ndim != 2:
-            raise RuntimeError(
-                "A has dim = {}, B has dim = {}. If multiplying with @, A and B must have dim = 2.".format(
-                    self.ndim, other.ndim
-                )
-            )
-
-        m = self.shape[0]
-        n = other.shape[1]
-        c = warp.zeros(shape=(m, n), dtype=self.dtype, device=self.device, requires_grad=True)
-        d = warp.zeros(shape=(m, n), dtype=self.dtype, device=self.device, requires_grad=True)
-        matmul(self, other, c, d, device=self.device)
-        return d
-
     @property
     def grad(self):
         return self._grad
@@ -1863,7 +1843,7 @@ class array(Array):
         # member attributes available during code-gen (e.g.: d = array.shape[0])
         # Note: we use a shared dict for all array instances
         if array._vars is None:
-            array._vars = {"shape": warp.codegen.Var("shape", shape_t)}
+            array._vars = {"shape": warp2.codegen.Var("shape", shape_t)}
         return array._vars
 
     def zero_(self):
@@ -1906,7 +1886,7 @@ class array(Array):
 
         # try to convert the given value to the array dtype
         try:
-            if isinstance(self.dtype, warp.codegen.Struct):
+            if isinstance(self.dtype, warp2.codegen.Struct):
                 if isinstance(value, self.dtype.cls):
                     cvalue = value.__ctype__()
                 elif value == 0:
@@ -1921,7 +1901,7 @@ class array(Array):
                 cvalue = self.dtype(value)
             else:
                 # scalar
-                if type(value) in warp.types.scalar_types:
+                if type(value) in warp2.types.scalar_types:
                     value = value.value
                 if self.dtype == float16:
                     cvalue = self.dtype._type_(float_to_half_bits(value))
@@ -1941,18 +1921,18 @@ class array(Array):
             carr_ptr = ctypes.pointer(carr)
 
             if self.device.is_cuda:
-                warp.context.runtime.core.array_fill_device(
+                warp2.context.runtime.core.array_fill_device(
                     self.device.context, carr_ptr, ARRAY_TYPE_REGULAR, cvalue_ptr, cvalue_size
                 )
             else:
-                warp.context.runtime.core.array_fill_host(carr_ptr, ARRAY_TYPE_REGULAR, cvalue_ptr, cvalue_size)
+                warp2.context.runtime.core.array_fill_host(carr_ptr, ARRAY_TYPE_REGULAR, cvalue_ptr, cvalue_size)
 
     def assign(self, src):
-        """Wraps ``src`` in an :class:`warp.array` if it is not already one and copies the contents to ``self``."""
+        """Wraps ``src`` in an :class:`warp2.array` if it is not already one and copies the contents to ``self``."""
         if is_array(src):
-            warp.copy(self, src)
+            warp2.copy(self, src)
         else:
-            warp.copy(self, array(data=src, dtype=self.dtype, copy=False, device="cpu"))
+            warp2.copy(self, array(data=src, dtype=self.dtype, copy=False, device="cpu"))
 
     def numpy(self):
         """Converts the array to a :class:`numpy.ndarray` (aliasing memory through the array interface protocol)
@@ -1961,14 +1941,14 @@ class array(Array):
         """
         if self.ptr:
             # use the CUDA default stream for synchronous behaviour with other streams
-            with warp.ScopedStream(self.device.null_stream):
+            with warp2.ScopedStream(self.device.null_stream):
                 a = self.to("cpu")
             # convert through __array_interface__
             # Note: this handles arrays of structs using `descr`, so the result will be a structured NumPy array
             return np.array(a, copy=False)
         else:
             # return an empty numpy array with the correct dtype and shape
-            if isinstance(self.dtype, warp.codegen.Struct):
+            if isinstance(self.dtype, warp2.codegen.Struct):
                 npdtype = self.dtype.numpy_dtype()
                 npshape = self.shape
             elif issubclass(self.dtype, ctypes.Array):
@@ -1997,7 +1977,7 @@ class array(Array):
                 "Accessing array memory through a ctypes ptr is only supported for contiguous CPU arrays."
             )
 
-        if isinstance(self.dtype, warp.codegen.Struct):
+        if isinstance(self.dtype, warp2.codegen.Struct):
             p = ctypes.cast(self.ptr, ctypes.POINTER(self.dtype.ctype))
         else:
             p = ctypes.cast(self.ptr, ctypes.POINTER(self.dtype._type_))
@@ -2011,7 +1991,7 @@ class array(Array):
         """Returns a flattened list of items in the array as a Python list."""
         a = self.numpy()
 
-        if isinstance(self.dtype, warp.codegen.Struct):
+        if isinstance(self.dtype, warp2.codegen.Struct):
             # struct
             a = a.flatten()
             data = a.ctypes.data
@@ -2029,11 +2009,11 @@ class array(Array):
 
     def to(self, device):
         """Returns a Warp array with this array's data moved to the specified device, no-op if already on device."""
-        device = warp.get_device(device)
+        device = warp2.get_device(device)
         if self.device == device:
             return self
         else:
-            return warp.clone(self, device=device)
+            return warp2.clone(self, device=device)
 
     def flatten(self):
         """Returns a zero-copy view of the array collapsed to 1-D. Only supported for contiguous arrays."""
@@ -2148,8 +2128,8 @@ class array(Array):
         if self.is_contiguous:
             return self
 
-        a = warp.empty_like(self)
-        warp.copy(a, self)
+        a = warp2.empty_like(self)
+        warp2.copy(a, self)
         return a
 
     def transpose(self, axes=None):
@@ -2245,36 +2225,36 @@ class noncontiguous_array_base(Generic[T]):
 
     # return a contiguous copy
     def contiguous(self):
-        a = warp.empty_like(self)
-        warp.copy(a, self)
+        a = warp2.empty_like(self)
+        warp2.copy(a, self)
         return a
 
     # copy data from one device to another, nop if already on device
     def to(self, device):
-        device = warp.get_device(device)
+        device = warp2.get_device(device)
         if self.device == device:
             return self
         else:
-            return warp.clone(self, device=device)
+            return warp2.clone(self, device=device)
 
     # return a contiguous numpy copy
     def numpy(self):
         # use the CUDA default stream for synchronous behaviour with other streams
-        with warp.ScopedStream(self.device.null_stream):
+        with warp2.ScopedStream(self.device.null_stream):
             return self.contiguous().numpy()
 
     # returns a flattened list of items in the array as a Python list
     def list(self):
         # use the CUDA default stream for synchronous behaviour with other streams
-        with warp.ScopedStream(self.device.null_stream):
+        with warp2.ScopedStream(self.device.null_stream):
             return self.contiguous().list()
 
     # equivalent to wrapping src data in an array and copying to self
     def assign(self, src):
         if is_array(src):
-            warp.copy(self, src)
+            warp2.copy(self, src)
         else:
-            warp.copy(self, array(data=src, dtype=self.dtype, copy=False, device="cpu"))
+            warp2.copy(self, array(data=src, dtype=self.dtype, copy=False, device="cpu"))
 
     def zero_(self):
         self.fill_(0)
@@ -2285,7 +2265,7 @@ class noncontiguous_array_base(Generic[T]):
 
         # try to convert the given value to the array dtype
         try:
-            if isinstance(self.dtype, warp.codegen.Struct):
+            if isinstance(self.dtype, warp2.codegen.Struct):
                 if isinstance(value, self.dtype.cls):
                     cvalue = value.__ctype__()
                 elif value == 0:
@@ -2300,7 +2280,7 @@ class noncontiguous_array_base(Generic[T]):
                 cvalue = self.dtype(value)
             else:
                 # scalar
-                if type(value) in warp.types.scalar_types:
+                if type(value) in warp2.types.scalar_types:
                     value = value.value
                 if self.dtype == float16:
                     cvalue = self.dtype._type_(float_to_half_bits(value))
@@ -2316,11 +2296,11 @@ class noncontiguous_array_base(Generic[T]):
         ctype_ptr = ctypes.pointer(ctype)
 
         if self.device.is_cuda:
-            warp.context.runtime.core.array_fill_device(
+            warp2.context.runtime.core.array_fill_device(
                 self.device.context, ctype_ptr, self.type_id, cvalue_ptr, cvalue_size
             )
         else:
-            warp.context.runtime.core.array_fill_host(ctype_ptr, self.type_id, cvalue_ptr, cvalue_size)
+            warp2.context.runtime.core.array_fill_host(ctype_ptr, self.type_id, cvalue_ptr, cvalue_size)
 
 
 # helper to check index array properties
@@ -2427,7 +2407,7 @@ class indexedarray(noncontiguous_array_base[T]):
         # member attributes available during code-gen (e.g.: d = arr.shape[0])
         # Note: we use a shared dict for all indexedarray instances
         if indexedarray._vars is None:
-            indexedarray._vars = {"shape": warp.codegen.Var("shape", shape_t)}
+            indexedarray._vars = {"shape": warp2.codegen.Var("shape", shape_t)}
         return indexedarray._vars
 
 
@@ -2455,7 +2435,7 @@ def indexedarray4d(*args, **kwargs):
     return indexedarray(*args, **kwargs)
 
 
-from warp.fabric import fabricarray, indexedfabricarray  # noqa: E402
+from warp2.fabric import fabricarray, indexedfabricarray  # noqa: E402
 
 array_types = (array, indexedarray, fabricarray, indexedfabricarray)
 
@@ -2471,1391 +2451,6 @@ def array_type_id(a):
         return ARRAY_TYPE_FABRIC_INDEXED
     else:
         raise ValueError("Invalid array type")
-
-
-class Bvh:
-    def __init__(self, lowers, uppers):
-        """Class representing a bounding volume hierarchy.
-
-        Attributes:
-            id: Unique identifier for this bvh object, can be passed to kernels.
-            device: Device this object lives on, all buffers must live on the same device.
-
-        Args:
-            lowers (:class:`warp.array`): Array of lower bounds :class:`warp.vec3`
-            uppers (:class:`warp.array`): Array of upper bounds :class:`warp.vec3`
-        """
-
-        if len(lowers) != len(uppers):
-            raise RuntimeError("Bvh the same number of lower and upper bounds must be provided")
-
-        if lowers.device != uppers.device:
-            raise RuntimeError("Bvh lower and upper bounds must live on the same device")
-
-        if lowers.dtype != vec3 or not lowers.is_contiguous:
-            raise RuntimeError("Bvh lowers should be a contiguous array of type wp.vec3")
-
-        if uppers.dtype != vec3 or not uppers.is_contiguous:
-            raise RuntimeError("Bvh uppers should be a contiguous array of type wp.vec3")
-
-        self.device = lowers.device
-        self.lowers = lowers
-        self.uppers = uppers
-
-        def get_data(array):
-            if array:
-                return ctypes.c_void_p(array.ptr)
-            else:
-                return ctypes.c_void_p(0)
-
-        from warp.context import runtime
-
-        if self.device.is_cpu:
-            self.id = runtime.core.bvh_create_host(get_data(lowers), get_data(uppers), int(len(lowers)))
-        else:
-            self.id = runtime.core.bvh_create_device(
-                self.device.context, get_data(lowers), get_data(uppers), int(len(lowers))
-            )
-
-    def __del__(self):
-        try:
-            from warp.context import runtime
-
-            if self.device.is_cpu:
-                runtime.core.bvh_destroy_host(self.id)
-            else:
-                # use CUDA context guard to avoid side effects during garbage collection
-                with self.device.context_guard:
-                    runtime.core.bvh_destroy_device(self.id)
-
-        except Exception:
-            pass
-
-    def refit(self):
-        """Refit the BVH. This should be called after users modify the `lowers` and `uppers` arrays."""
-
-        from warp.context import runtime
-
-        if self.device.is_cpu:
-            runtime.core.bvh_refit_host(self.id)
-        else:
-            runtime.core.bvh_refit_device(self.id)
-            runtime.verify_cuda_device(self.device)
-
-
-class Mesh:
-    from warp.codegen import Var
-
-    vars = {
-        "points": Var("points", array(dtype=vec3)),
-        "velocities": Var("velocities", array(dtype=vec3)),
-        "indices": Var("indices", array(dtype=int32)),
-    }
-
-    def __init__(self, points=None, indices=None, velocities=None, support_winding_number=False):
-        """Class representing a triangle mesh.
-
-        Attributes:
-            id: Unique identifier for this mesh object, can be passed to kernels.
-            device: Device this object lives on, all buffers must live on the same device.
-
-        Args:
-            points (:class:`warp.array`): Array of vertex positions of type :class:`warp.vec3`
-            indices (:class:`warp.array`): Array of triangle indices of type :class:`warp.int32`, should be a 1d array with shape (num_tris, 3)
-            velocities (:class:`warp.array`): Array of vertex velocities of type :class:`warp.vec3` (optional)
-            support_winding_number (bool): If true the mesh will build additional datastructures to support `wp.mesh_query_point_sign_winding_number()` queries
-        """
-
-        if points.device != indices.device:
-            raise RuntimeError("Mesh points and indices must live on the same device")
-
-        if points.dtype != vec3 or not points.is_contiguous:
-            raise RuntimeError("Mesh points should be a contiguous array of type wp.vec3")
-
-        if velocities and (velocities.dtype != vec3 or not velocities.is_contiguous):
-            raise RuntimeError("Mesh velocities should be a contiguous array of type wp.vec3")
-
-        if indices.dtype != int32 or not indices.is_contiguous:
-            raise RuntimeError("Mesh indices should be a contiguous array of type wp.int32")
-
-        if indices.ndim > 1:
-            raise RuntimeError("Mesh indices should be a flattened 1d array of indices")
-
-        self.device = points.device
-        self.points = points
-        self.velocities = velocities
-        self.indices = indices
-
-        from warp.context import runtime
-
-        if self.device.is_cpu:
-            self.id = runtime.core.mesh_create_host(
-                points.__ctype__(),
-                velocities.__ctype__() if velocities else array().__ctype__(),
-                indices.__ctype__(),
-                int(len(points)),
-                int(indices.size / 3),
-                int(support_winding_number),
-            )
-        else:
-            self.id = runtime.core.mesh_create_device(
-                self.device.context,
-                points.__ctype__(),
-                velocities.__ctype__() if velocities else array().__ctype__(),
-                indices.__ctype__(),
-                int(len(points)),
-                int(indices.size / 3),
-                int(support_winding_number),
-            )
-
-    def __del__(self):
-        try:
-            from warp.context import runtime
-
-            if self.device.is_cpu:
-                runtime.core.mesh_destroy_host(self.id)
-            else:
-                # use CUDA context guard to avoid side effects during garbage collection
-                with self.device.context_guard:
-                    runtime.core.mesh_destroy_device(self.id)
-        except Exception:
-            pass
-
-    def refit(self):
-        """Refit the BVH to points. This should be called after users modify the `points` data."""
-
-        from warp.context import runtime
-
-        if self.device.is_cpu:
-            runtime.core.mesh_refit_host(self.id)
-        else:
-            runtime.core.mesh_refit_device(self.id)
-            runtime.verify_cuda_device(self.device)
-
-
-class Volume:
-    #: Enum value to specify nearest-neighbor interpolation during sampling
-    CLOSEST = constant(0)
-    #: Enum value to specify trilinear interpolation during sampling
-    LINEAR = constant(1)
-
-    def __init__(self, data: array):
-        """Class representing a sparse grid.
-
-        Args:
-            data (:class:`warp.array`): Array of bytes representing the volume in NanoVDB format
-        """
-
-        self.id = 0
-
-        from warp.context import runtime
-
-        self.context = runtime
-
-        if data is None:
-            return
-
-        if data.device is None:
-            raise RuntimeError("Invalid device")
-        self.device = data.device
-
-        if self.device.is_cpu:
-            self.id = self.context.core.volume_create_host(ctypes.cast(data.ptr, ctypes.c_void_p), data.size)
-        else:
-            self.id = self.context.core.volume_create_device(
-                self.device.context, ctypes.cast(data.ptr, ctypes.c_void_p), data.size
-            )
-
-        if self.id == 0:
-            raise RuntimeError("Failed to create volume from input array")
-
-    def __del__(self):
-        if self.id == 0:
-            return
-
-        try:
-            from warp.context import runtime
-
-            if self.device.is_cpu:
-                runtime.core.volume_destroy_host(self.id)
-            else:
-                # use CUDA context guard to avoid side effects during garbage collection
-                with self.device.context_guard:
-                    runtime.core.volume_destroy_device(self.id)
-
-        except Exception:
-            pass
-
-    def array(self) -> array:
-        """Returns the raw memory buffer of the Volume as an array"""
-        buf = ctypes.c_void_p(0)
-        size = ctypes.c_uint64(0)
-        if self.device.is_cpu:
-            self.context.core.volume_get_buffer_info_host(self.id, ctypes.byref(buf), ctypes.byref(size))
-        else:
-            self.context.core.volume_get_buffer_info_device(self.id, ctypes.byref(buf), ctypes.byref(size))
-        return array(ptr=buf.value, dtype=uint8, shape=size.value, device=self.device, owner=False)
-
-    def get_tiles(self) -> array:
-        if self.id == 0:
-            raise RuntimeError("Invalid Volume")
-
-        buf = ctypes.c_void_p(0)
-        size = ctypes.c_uint64(0)
-        if self.device.is_cpu:
-            self.context.core.volume_get_tiles_host(self.id, ctypes.byref(buf), ctypes.byref(size))
-        else:
-            self.context.core.volume_get_tiles_device(self.id, ctypes.byref(buf), ctypes.byref(size))
-        num_tiles = size.value // (3 * 4)
-        return array(ptr=buf.value, dtype=int32, shape=(num_tiles, 3), device=self.device, owner=True)
-
-    def get_voxel_size(self) -> Tuple[float, float, float]:
-        if self.id == 0:
-            raise RuntimeError("Invalid Volume")
-
-        dx, dy, dz = ctypes.c_float(0), ctypes.c_float(0), ctypes.c_float(0)
-        self.context.core.volume_get_voxel_size(self.id, ctypes.byref(dx), ctypes.byref(dy), ctypes.byref(dz))
-        return (dx.value, dy.value, dz.value)
-
-    @classmethod
-    def load_from_nvdb(cls, file_or_buffer, device=None) -> Volume:
-        """Creates a Volume object from a NanoVDB file or in-memory buffer.
-
-        Returns:
-
-            A ``warp.Volume`` object.
-        """
-        try:
-            data = file_or_buffer.read()
-        except AttributeError:
-            data = file_or_buffer
-
-        magic, version, grid_count, codec = struct.unpack("<QIHH", data[0:16])
-        if magic != 0x304244566F6E614E:
-            raise RuntimeError("NanoVDB signature not found")
-        if version >> 21 != 32:  # checking major version
-            raise RuntimeError("Unsupported NanoVDB version")
-        if grid_count != 1:
-            raise RuntimeError("Only NVDBs with exactly one grid are supported")
-
-        grid_data_offset = 192 + struct.unpack("<I", data[152:156])[0]
-        if codec == 0:  # no compression
-            grid_data = data[grid_data_offset:]
-        elif codec == 1:  # zip compression
-            grid_data = zlib.decompress(data[grid_data_offset + 8:])
-        else:
-            raise RuntimeError(f"Unsupported codec code: {codec}")
-
-        magic = struct.unpack("<Q", grid_data[0:8])[0]
-        if magic != 0x304244566F6E614E:
-            raise RuntimeError("NanoVDB signature not found on grid!")
-
-        data_array = array(np.frombuffer(grid_data, dtype=np.byte), device=device)
-        return cls(data_array)
-
-    @classmethod
-    def load_from_numpy(
-            cls, ndarray: np.array, min_world=(0.0, 0.0, 0.0), voxel_size=1.0, bg_value=0.0, device=None
-    ) -> Volume:
-        """Creates a Volume object from a dense 3D NumPy array.
-
-        This function is only supported for CUDA devices.
-
-        Args:
-            min_world: The 3D coordinate of the lower corner of the volume.
-            voxel_size: The size of each voxel in spatial coordinates.
-            bg_value: Background value
-            device: The CUDA device to create the volume on, e.g.: "cuda" or "cuda:0".
-
-        Returns:
-
-            A ``warp.Volume`` object.
-        """
-
-        import math
-
-        target_shape = (
-            math.ceil(ndarray.shape[0] / 8) * 8,
-            math.ceil(ndarray.shape[1] / 8) * 8,
-            math.ceil(ndarray.shape[2] / 8) * 8,
-        )
-        if hasattr(bg_value, "__len__"):
-            # vec3, assuming the numpy array is 4D
-            padded_array = np.array((target_shape[0], target_shape[1], target_shape[2], 3), dtype=np.single)
-            padded_array[:, :, :, :] = np.array(bg_value)
-            padded_array[0: ndarray.shape[0], 0: ndarray.shape[1], 0: ndarray.shape[2], :] = ndarray
-        else:
-            padded_amount = (
-                math.ceil(ndarray.shape[0] / 8) * 8 - ndarray.shape[0],
-                math.ceil(ndarray.shape[1] / 8) * 8 - ndarray.shape[1],
-                math.ceil(ndarray.shape[2] / 8) * 8 - ndarray.shape[2],
-            )
-            padded_array = np.pad(
-                ndarray,
-                ((0, padded_amount[0]), (0, padded_amount[1]), (0, padded_amount[2])),
-                mode="constant",
-                constant_values=bg_value,
-            )
-
-        shape = padded_array.shape
-        volume = warp.Volume.allocate(
-            min_world,
-            [
-                min_world[0] + (shape[0] - 1) * voxel_size,
-                min_world[1] + (shape[1] - 1) * voxel_size,
-                min_world[2] + (shape[2] - 1) * voxel_size,
-            ],
-            voxel_size,
-            bg_value=bg_value,
-            points_in_world_space=True,
-            translation=min_world,
-            device=device,
-        )
-
-        # Populate volume
-        if hasattr(bg_value, "__len__"):
-            warp.launch(
-                warp.utils.copy_dense_volume_to_nano_vdb_v,
-                dim=(shape[0], shape[1], shape[2]),
-                inputs=[volume.id, warp.array(padded_array, dtype=warp.vec3, device=device)],
-                device=device,
-            )
-        elif isinstance(bg_value, int):
-            warp.launch(
-                warp.utils.copy_dense_volume_to_nano_vdb_i,
-                dim=shape,
-                inputs=[volume.id, warp.array(padded_array, dtype=warp.int32, device=device)],
-                device=device,
-            )
-        else:
-            warp.launch(
-                warp.utils.copy_dense_volume_to_nano_vdb_f,
-                dim=shape,
-                inputs=[volume.id, warp.array(padded_array, dtype=warp.float32, device=device)],
-                device=device,
-            )
-
-        return volume
-
-    @classmethod
-    def allocate(
-            cls,
-            min: List[int],
-            max: List[int],
-            voxel_size: float,
-            bg_value=0.0,
-            translation=(0.0, 0.0, 0.0),
-            points_in_world_space=False,
-            device=None,
-    ) -> Volume:
-        """Allocate a new Volume based on the bounding box defined by min and max.
-
-        This function is only supported for CUDA devices.
-
-        Allocate a volume that is large enough to contain voxels [min[0], min[1], min[2]] - [max[0], max[1], max[2]], inclusive.
-        If points_in_world_space is true, then min and max are first converted to index space with the given voxel size and
-        translation, and the volume is allocated with those.
-
-        The smallest unit of allocation is a dense tile of 8x8x8 voxels, the requested bounding box is rounded up to tiles, and
-        the resulting tiles will be available in the new volume.
-
-        Args:
-            min (array-like): Lower 3D coordinates of the bounding box in index space or world space, inclusive.
-            max (array-like): Upper 3D coordinates of the bounding box in index space or world space, inclusive.
-            voxel_size (float): Voxel size of the new volume.
-            bg_value (float or array-like): Value of unallocated voxels of the volume, also defines the volume's type, a :class:`warp.vec3` volume is created if this is `array-like`, otherwise a float volume is created
-            translation (array-like): translation between the index and world spaces.
-            device (Devicelike): The CUDA device to create the volume on, e.g.: "cuda" or "cuda:0".
-
-        """
-        if points_in_world_space:
-            min = np.around((np.array(min, dtype=np.float32) - translation) / voxel_size)
-            max = np.around((np.array(max, dtype=np.float32) - translation) / voxel_size)
-
-        tile_min = np.array(min, dtype=np.int32) // 8
-        tile_max = np.array(max, dtype=np.int32) // 8
-        tiles = np.array(
-            [
-                [i, j, k]
-                for i in range(tile_min[0], tile_max[0] + 1)
-                for j in range(tile_min[1], tile_max[1] + 1)
-                for k in range(tile_min[2], tile_max[2] + 1)
-            ],
-            dtype=np.int32,
-        )
-        tile_points = array(tiles * 8, device=device)
-
-        return cls.allocate_by_tiles(tile_points, voxel_size, bg_value, translation, device)
-
-    @classmethod
-    def allocate_by_tiles(
-            cls, tile_points: array, voxel_size: float, bg_value=0.0, translation=(0.0, 0.0, 0.0), device=None
-    ) -> Volume:
-        """Allocate a new Volume with active tiles for each point tile_points.
-
-        This function is only supported for CUDA devices.
-
-        The smallest unit of allocation is a dense tile of 8x8x8 voxels.
-        This is the primary method for allocating sparse volumes. It uses an array of points indicating the tiles that must be allocated.
-
-        Example use cases:
-            * `tile_points` can mark tiles directly in index space as in the case this method is called by `allocate`.
-            * `tile_points` can be a list of points used in a simulation that needs to transfer data to a volume.
-
-        Args:
-            tile_points (:class:`warp.array`): Array of positions that define the tiles to be allocated.
-                The array can be a 2D, N-by-3 array of :class:`warp.int32` values, indicating index space positions,
-                or can be a 1D array of :class:`warp.vec3` values, indicating world space positions.
-                Repeated points per tile are allowed and will be efficiently deduplicated.
-            voxel_size (float): Voxel size of the new volume.
-            bg_value (float or array-like): Value of unallocated voxels of the volume, also defines the volume's type, a :class:`warp.vec3` volume is created if this is `array-like`, otherwise a float volume is created
-            translation (array-like): Translation between the index and world spaces.
-            device (Devicelike): The CUDA device to create the volume on, e.g.: "cuda" or "cuda:0".
-
-        """
-        from warp.context import runtime
-
-        device = runtime.get_device(device)
-
-        if voxel_size <= 0.0:
-            raise RuntimeError(f"Voxel size must be positive! Got {voxel_size}")
-        if not device.is_cuda:
-            raise RuntimeError("Only CUDA devices are supported for allocate_by_tiles")
-        if not (
-                isinstance(tile_points, array)
-                and (tile_points.dtype == int32 and tile_points.ndim == 2)
-                or (tile_points.dtype == vec3 and tile_points.ndim == 1)
-        ):
-            raise RuntimeError("Expected an warp array of vec3s or of n-by-3 int32s as tile_points!")
-        if not tile_points.device.is_cuda:
-            tile_points = array(tile_points, dtype=tile_points.dtype, device=device)
-
-        volume = cls(data=None)
-        volume.device = device
-        in_world_space = tile_points.dtype == vec3
-        if hasattr(bg_value, "__len__"):
-            volume.id = volume.context.core.volume_v_from_tiles_device(
-                volume.device.context,
-                ctypes.c_void_p(tile_points.ptr),
-                tile_points.shape[0],
-                voxel_size,
-                bg_value[0],
-                bg_value[1],
-                bg_value[2],
-                translation[0],
-                translation[1],
-                translation[2],
-                in_world_space,
-            )
-        elif isinstance(bg_value, int):
-            volume.id = volume.context.core.volume_i_from_tiles_device(
-                volume.device.context,
-                ctypes.c_void_p(tile_points.ptr),
-                tile_points.shape[0],
-                voxel_size,
-                bg_value,
-                translation[0],
-                translation[1],
-                translation[2],
-                in_world_space,
-            )
-        else:
-            volume.id = volume.context.core.volume_f_from_tiles_device(
-                volume.device.context,
-                ctypes.c_void_p(tile_points.ptr),
-                tile_points.shape[0],
-                voxel_size,
-                float(bg_value),
-                translation[0],
-                translation[1],
-                translation[2],
-                in_world_space,
-            )
-
-        if volume.id == 0:
-            raise RuntimeError("Failed to create volume")
-
-        return volume
-
-
-def matmul(
-        a: array2d,
-        b: array2d,
-        c: array2d,
-        d: array2d,
-        alpha: float = 1.0,
-        beta: float = 0.0,
-        allow_tf32x3_arith: builtins.bool = False,
-        device=None,
-):
-    """Computes a generic matrix-matrix multiplication (GEMM) of the form: `d = alpha * (a @ b) + beta * c`.
-
-    Args:
-        a (array2d): two-dimensional array containing matrix A
-        b (array2d): two-dimensional array containing matrix B
-        c (array2d): two-dimensional array containing matrix C
-        d (array2d): two-dimensional array to which output D is written
-        alpha (float): parameter alpha of GEMM
-        beta (float): parameter beta of GEMM
-        allow_tf32x3_arith (bool): whether to use CUTLASS's 3xTF32 GEMMs, which enable accuracy similar to FP32
-                                   while using Tensor Cores
-        device: device we want to use to multiply matrices. Defaults to active runtime device. If "cpu", resorts to using numpy multiplication.
-    """
-    from warp.context import runtime
-
-    if device is None:
-        device = runtime.get_device(device)
-
-    if a.device != device or b.device != device or c.device != device or d.device != device:
-        raise RuntimeError("Matrices A, B, C, and D must all be on the same device as the runtime device.")
-
-    if a.dtype != b.dtype or a.dtype != c.dtype or a.dtype != d.dtype:
-        raise RuntimeError(
-            "wp.matmul currently only supports operation between {A, B, C, D} matrices of the same type."
-        )
-
-    if (not a.is_contiguous and not a.is_transposed) or (not b.is_contiguous and not b.is_transposed) or (
-            not c.is_contiguous) or (not d.is_contiguous):
-        raise RuntimeError(
-            "wp.matmul is only valid for contiguous arrays, with the exception that A and/or B may be transposed."
-        )
-
-    m = a.shape[0]
-    n = b.shape[1]
-    k = a.shape[1]
-    if b.shape != (k, n) or c.shape != (m, n) or d.shape != (m, n):
-        raise RuntimeError(
-            "Invalid shapes for matrices: A = {} B = {} C = {} D = {}".format(a.shape, b.shape, c.shape, d.shape)
-        )
-
-    if runtime.tape:
-        runtime.tape.record_func(
-            backward=lambda: adj_matmul(
-                a, b, c, a.grad, b.grad, c.grad, d.grad, alpha, beta, allow_tf32x3_arith, device
-            ),
-            arrays=[a, b, c, d],
-        )
-
-    # cpu fallback if no cuda devices found
-    if device == "cpu":
-        d.assign(alpha * (a.numpy() @ b.numpy()) + beta * c.numpy())
-        return
-
-    cc = device.arch
-    ret = runtime.core.cutlass_gemm(
-        cc,
-        m,
-        n,
-        k,
-        type_typestr(a.dtype).encode(),
-        ctypes.c_void_p(a.ptr),
-        ctypes.c_void_p(b.ptr),
-        ctypes.c_void_p(c.ptr),
-        ctypes.c_void_p(d.ptr),
-        alpha,
-        beta,
-        not a.is_transposed,
-        not b.is_transposed,
-        allow_tf32x3_arith,
-        1,
-    )
-    if not ret:
-        raise RuntimeError("matmul failed.")
-
-
-def adj_matmul(
-        a: array2d,
-        b: array2d,
-        c: array2d,
-        adj_a: array2d,
-        adj_b: array2d,
-        adj_c: array2d,
-        adj_d: array2d,
-        alpha: float = 1.0,
-        beta: float = 0.0,
-        allow_tf32x3_arith: builtins.bool = False,
-        device=None,
-):
-    """Computes the adjoint of a generic matrix-matrix multiplication (GEMM) of the form: `d = alpha * (a @ b) + beta * c`.
-        note: the adjoint of parameter alpha is not included but can be computed as `adj_alpha = np.sum(np.concatenate(np.multiply(a @ b, adj_d)))`.
-        note: the adjoint of parameter beta is not included but can be computed as `adj_beta = np.sum(np.concatenate(np.multiply(c, adj_d)))`.
-
-    Args:
-        a (array2d): two-dimensional array containing matrix A
-        b (array2d): two-dimensional array containing matrix B
-        c (array2d): two-dimensional array containing matrix C
-        adj_a (array2d): two-dimensional array to which the adjoint of matrix A is written
-        adj_b (array2d): two-dimensional array to which the adjoint of matrix B is written
-        adj_c (array2d): two-dimensional array to which the adjoint of matrix C is written
-        adj_d (array2d): two-dimensional array containing the adjoint of matrix D
-        alpha (float): parameter alpha of GEMM
-        beta (float): parameter beta of GEMM
-        allow_tf32x3_arith (bool): whether to use CUTLASS's 3xTF32 GEMMs, which enable accuracy similar to FP32
-                                   while using Tensor Cores
-        device: device we want to use to multiply matrices. Defaults to active runtime device. If "cpu", resorts to using numpy multiplication.
-    """
-    from warp.context import runtime
-
-    if device is None:
-        device = runtime.get_device(device)
-
-    if (
-            a.device != device
-            or b.device != device
-            or c.device != device
-            or adj_a.device != device
-            or adj_b.device != device
-            or adj_c.device != device
-            or adj_d.device != device
-    ):
-        raise RuntimeError(
-            "Matrices A, B, C, D, and their adjoints must all be on the same device as the runtime device."
-        )
-
-    if (
-            a.dtype != b.dtype
-            or a.dtype != c.dtype
-            or a.dtype != adj_a.dtype
-            or a.dtype != adj_b.dtype
-            or a.dtype != adj_c.dtype
-            or a.dtype != adj_d.dtype
-    ):
-        raise RuntimeError(
-            "wp.adj_matmul currently only supports operation between {A, B, C, adj_D, adj_A, adj_B, adj_C} matrices of the same type."
-        )
-
-    if (
-            (not a.is_contiguous and not a.is_transposed)
-            or (not b.is_contiguous and not b.is_transposed)
-            or (not c.is_contiguous)
-            or (not adj_a.is_contiguous and not adj_a.is_transposed)
-            or (not adj_b.is_contiguous and not adj_b.is_transposed)
-            or (not adj_c.is_contiguous)
-            or (not adj_d.is_contiguous)
-    ):
-        raise RuntimeError(
-            "wp.matmul is only valid for contiguous arrays, with the exception that A and/or B and their associated adjoints may be transposed."
-        )
-
-    m = a.shape[0]
-    n = b.shape[1]
-    k = a.shape[1]
-    if (
-            a.shape != (m, k)
-            or b.shape != (k, n)
-            or c.shape != (m, n)
-            or adj_d.shape != (m, n)
-            or adj_a.shape != (m, k)
-            or adj_b.shape != (k, n)
-            or adj_c.shape != (m, n)
-    ):
-        raise RuntimeError(
-            "Invalid shapes for matrices: A = {} B = {} C = {} adj_D = {} adj_A = {} adj_B = {} adj_C = {}".format(
-                a.shape, b.shape, c.shape, adj_d.shape, adj_a.shape, adj_b.shape, adj_c.shape
-            )
-        )
-
-    # cpu fallback if no cuda devices found
-    if device == "cpu":
-        adj_a.assign(alpha * np.matmul(adj_d.numpy(), b.numpy().transpose()))
-        adj_b.assign(alpha * (a.numpy().transpose() @ adj_d.numpy()))
-        adj_c.assign(beta * adj_d.numpy())
-        return
-
-    cc = device.arch
-
-    # adj_a
-    if not a.is_transposed:
-        ret = runtime.core.cutlass_gemm(
-            cc,
-            m,
-            k,
-            n,
-            type_typestr(a.dtype).encode(),
-            ctypes.c_void_p(adj_d.ptr),
-            ctypes.c_void_p(b.ptr),
-            ctypes.c_void_p(a.ptr),
-            ctypes.c_void_p(adj_a.ptr),
-            alpha,
-            0.0,
-            True,
-            b.is_transposed,
-            allow_tf32x3_arith,
-            1,
-        )
-        if not ret:
-            raise RuntimeError("adj_matmul failed.")
-    else:
-        ret = runtime.core.cutlass_gemm(
-            cc,
-            k,
-            m,
-            n,
-            type_typestr(a.dtype).encode(),
-            ctypes.c_void_p(b.ptr),
-            ctypes.c_void_p(adj_d.ptr),
-            ctypes.c_void_p(a.ptr),
-            ctypes.c_void_p(adj_a.ptr),
-            alpha,
-            0.0,
-            not b.is_transposed,
-            False,
-            allow_tf32x3_arith,
-            1,
-        )
-        if not ret:
-            raise RuntimeError("adj_matmul failed.")
-
-    # adj_b
-    if not b.is_transposed:
-        ret = runtime.core.cutlass_gemm(
-            cc,
-            k,
-            n,
-            m,
-            type_typestr(a.dtype).encode(),
-            ctypes.c_void_p(a.ptr),
-            ctypes.c_void_p(adj_d.ptr),
-            ctypes.c_void_p(b.ptr),
-            ctypes.c_void_p(adj_b.ptr),
-            alpha,
-            0.0,
-            a.is_transposed,
-            True,
-            allow_tf32x3_arith,
-            1,
-        )
-        if not ret:
-            raise RuntimeError("adj_matmul failed.")
-    else:
-        ret = runtime.core.cutlass_gemm(
-            cc,
-            n,
-            k,
-            m,
-            type_typestr(a.dtype).encode(),
-            ctypes.c_void_p(adj_d.ptr),
-            ctypes.c_void_p(a.ptr),
-            ctypes.c_void_p(b.ptr),
-            ctypes.c_void_p(adj_b.ptr),
-            alpha,
-            0.0,
-            False,
-            not a.is_transposed,
-            allow_tf32x3_arith,
-            1,
-        )
-        if not ret:
-            raise RuntimeError("adj_matmul failed.")
-
-            # adj_c
-    ret = runtime.core.cutlass_gemm(
-        cc,
-        m,
-        n,
-        k,
-        type_typestr(a.dtype).encode(),
-        ctypes.c_void_p(a.ptr),
-        ctypes.c_void_p(b.ptr),
-        ctypes.c_void_p(adj_d.ptr),
-        ctypes.c_void_p(adj_c.ptr),
-        0.0,
-        beta,
-        not a.is_transposed,
-        not b.is_transposed,
-        allow_tf32x3_arith,
-        1,
-    )
-    if not ret:
-        raise RuntimeError("adj_matmul failed.")
-
-
-def batched_matmul(
-        a: array3d,
-        b: array3d,
-        c: array3d,
-        d: array3d,
-        alpha: float = 1.0,
-        beta: float = 0.0,
-        allow_tf32x3_arith: builtins.bool = False,
-        device=None,
-):
-    """Computes a batched generic matrix-matrix multiplication (GEMM) of the form: `d = alpha * (a @ b) + beta * c`.
-
-    Args:
-        a (array3d): three-dimensional array containing A matrices. Overall array dimension is {batch_count, M, K}
-        b (array3d): three-dimensional array containing B matrices. Overall array dimension is {batch_count, K, N}
-        c (array3d): three-dimensional array containing C matrices. Overall array dimension is {batch_count, M, N}
-        d (array3d): three-dimensional array to which output D is written. Overall array dimension is {batch_count, M, N}
-        alpha (float): parameter alpha of GEMM
-        beta (float): parameter beta of GEMM
-        allow_tf32x3_arith (bool): whether to use CUTLASS's 3xTF32 GEMMs, which enable accuracy similar to FP32
-                                   while using Tensor Cores
-        device: device we want to use to multiply matrices. Defaults to active runtime device. If "cpu", resorts to using numpy multiplication.
-    """
-    from warp.context import runtime
-
-    if device is None:
-        device = runtime.get_device(device)
-
-    if a.device != device or b.device != device or c.device != device or d.device != device:
-        raise RuntimeError("Matrices A, B, C, and D must all be on the same device as the runtime device.")
-
-    if a.dtype != b.dtype or a.dtype != c.dtype or a.dtype != d.dtype:
-        raise RuntimeError(
-            "wp.batched_matmul currently only supports operation between {A, B, C, D} matrices of the same type."
-        )
-
-    if (not a.is_contiguous and not a.is_transposed) or (not b.is_contiguous and not b.is_transposed) or (
-            not c.is_contiguous) or (not d.is_contiguous):
-        raise RuntimeError(
-            "wp.matmul is only valid for contiguous arrays, with the exception that A and/or B may be transposed."
-        )
-
-    m = a.shape[1]
-    n = b.shape[2]
-    k = a.shape[2]
-    batch_count = a.shape[0]
-    if b.shape != (batch_count, k, n) or c.shape != (batch_count, m, n) or d.shape != (batch_count, m, n):
-        raise RuntimeError(
-            "Invalid shapes for matrices: A = {} B = {} C = {} D = {}".format(a.shape, b.shape, c.shape, d.shape)
-        )
-
-    if runtime.tape:
-        runtime.tape.record_func(
-            backward=lambda: adj_batched_matmul(
-                a, b, c, a.grad, b.grad, c.grad, d.grad, alpha, beta, allow_tf32x3_arith, device
-            ),
-            arrays=[a, b, c, d],
-        )
-
-    # cpu fallback if no cuda devices found
-    if device == "cpu":
-        d.assign(alpha * np.matmul(a.numpy(), b.numpy()) + beta * c.numpy())
-        return
-
-    # handle case in which batch_count exceeds max_batch_count, which is a CUDA array size maximum
-    max_batch_count = 65535
-    iters = int(batch_count / max_batch_count)
-    remainder = batch_count % max_batch_count
-
-    cc = device.arch
-    for i in range(iters):
-        idx_start = i * max_batch_count
-        idx_end = (i + 1) * max_batch_count if i < iters - 1 else batch_count
-        ret = runtime.core.cutlass_gemm(
-            cc,
-            m,
-            n,
-            k,
-            type_typestr(a.dtype).encode(),
-            ctypes.c_void_p(a[idx_start:idx_end, :, :].ptr),
-            ctypes.c_void_p(b[idx_start:idx_end, :, :].ptr),
-            ctypes.c_void_p(c[idx_start:idx_end, :, :].ptr),
-            ctypes.c_void_p(d[idx_start:idx_end, :, :].ptr),
-            alpha,
-            beta,
-            not a.is_transposed,
-            not b.is_transposed,
-            allow_tf32x3_arith,
-            max_batch_count,
-        )
-        if not ret:
-            raise RuntimeError("Batched matmul failed.")
-
-    idx_start = iters * max_batch_count
-    ret = runtime.core.cutlass_gemm(
-        cc,
-        m,
-        n,
-        k,
-        type_typestr(a.dtype).encode(),
-        ctypes.c_void_p(a[idx_start:, :, :].ptr),
-        ctypes.c_void_p(b[idx_start:, :, :].ptr),
-        ctypes.c_void_p(c[idx_start:, :, :].ptr),
-        ctypes.c_void_p(d[idx_start:, :, :].ptr),
-        alpha,
-        beta,
-        not a.is_transposed,
-        not b.is_transposed,
-        allow_tf32x3_arith,
-        remainder,
-    )
-    if not ret:
-        raise RuntimeError("Batched matmul failed.")
-
-
-def adj_batched_matmul(
-        a: array3d,
-        b: array3d,
-        c: array3d,
-        adj_a: array3d,
-        adj_b: array3d,
-        adj_c: array3d,
-        adj_d: array3d,
-        alpha: float = 1.0,
-        beta: float = 0.0,
-        allow_tf32x3_arith: builtins.bool = False,
-        device=None,
-):
-    """Computes a batched generic matrix-matrix multiplication (GEMM) of the form: `d = alpha * (a @ b) + beta * c`.
-
-    Args:
-        a (array3d): three-dimensional array containing A matrices. Overall array dimension is {batch_count, M, K}
-        b (array3d): three-dimensional array containing B matrices. Overall array dimension is {batch_count, K, N}
-        c (array3d): three-dimensional array containing C matrices. Overall array dimension is {batch_count, M, N}
-        adj_a (array3d): three-dimensional array to which the adjoints of A matrices are written. Overall array dimension is {batch_count, M, K}
-        adj_b (array3d): three-dimensional array to which the adjoints of B matrices are written. Overall array dimension is {batch_count, K, N}
-        adj_c (array3d): three-dimensional array to which the adjoints of C matrices are written. Overall array dimension is {batch_count, M, N}
-        adj_d (array3d): three-dimensional array containing adjoints of D matrices. Overall array dimension is {batch_count, M, N}
-        alpha (float): parameter alpha of GEMM
-        beta (float): parameter beta of GEMM
-        allow_tf32x3_arith (bool): whether to use CUTLASS's 3xTF32 GEMMs, which enable accuracy similar to FP32
-                                   while using Tensor Cores
-        device: device we want to use to multiply matrices. Defaults to active runtime device. If "cpu", resorts to using numpy multiplication.
-    """
-    from warp.context import runtime
-
-    if device is None:
-        device = runtime.get_device(device)
-
-    if (
-            a.device != device
-            or b.device != device
-            or c.device != device
-            or adj_a.device != device
-            or adj_b.device != device
-            or adj_c.device != device
-            or adj_d.device != device
-    ):
-        raise RuntimeError(
-            "Matrices A, B, C, D, and their adjoints must all be on the same device as the runtime device."
-        )
-
-    if (
-            a.dtype != b.dtype
-            or a.dtype != c.dtype
-            or a.dtype != adj_a.dtype
-            or a.dtype != adj_b.dtype
-            or a.dtype != adj_c.dtype
-            or a.dtype != adj_d.dtype
-    ):
-        raise RuntimeError(
-            "wp.adj_batched_matmul currently only supports operation between {A, B, C, adj_D, adj_A, adj_B, adj_C} matrices of the same type."
-        )
-
-    m = a.shape[1]
-    n = b.shape[2]
-    k = a.shape[2]
-    batch_count = a.shape[0]
-    if (
-            b.shape != (batch_count, k, n)
-            or c.shape != (batch_count, m, n)
-            or adj_d.shape != (batch_count, m, n)
-            or adj_a.shape != (batch_count, m, k)
-            or adj_b.shape != (batch_count, k, n)
-            or adj_c.shape != (batch_count, m, n)
-    ):
-        raise RuntimeError(
-            "Invalid shapes for matrices: A = {} B = {} C = {} adj_D = {} adj_A = {} adj_B = {} adj_C = {}".format(
-                a.shape, b.shape, c.shape, adj_d.shape, adj_a.shape, adj_b.shape, adj_c.shape
-            )
-        )
-
-    if (
-            (not a.is_contiguous and not a.is_transposed)
-            or (not b.is_contiguous and not b.is_transposed)
-            or (not c.is_contiguous)
-            or (not adj_a.is_contiguous and not adj_a.is_transposed)
-            or (not adj_b.is_contiguous and not adj_b.is_transposed)
-            or (not adj_c.is_contiguous)
-            or (not adj_d.is_contiguous)
-    ):
-        raise RuntimeError(
-            "wp.matmul is only valid for contiguous arrays, with the exception that A and/or B and their associated adjoints may be transposed."
-        )
-
-    # cpu fallback if no cuda devices found
-    if device == "cpu":
-        adj_a.assign(alpha * np.matmul(adj_d.numpy(), b.numpy().transpose((0, 2, 1))))
-        adj_b.assign(alpha * np.matmul(a.numpy().transpose((0, 2, 1)), adj_d.numpy()))
-        adj_c.assign(beta * adj_d.numpy())
-        return
-
-    # handle case in which batch_count exceeds max_batch_count, which is a CUDA array size maximum
-    max_batch_count = 65535
-    iters = int(batch_count / max_batch_count)
-    remainder = batch_count % max_batch_count
-
-    cc = device.arch
-
-    for i in range(iters):
-        idx_start = i * max_batch_count
-        idx_end = (i + 1) * max_batch_count if i < iters - 1 else batch_count
-
-        # adj_a
-        if not a.is_transposed:
-            ret = runtime.core.cutlass_gemm(
-                cc,
-                m,
-                k,
-                n,
-                type_typestr(a.dtype).encode(),
-                ctypes.c_void_p(adj_d[idx_start:idx_end, :, :].ptr),
-                ctypes.c_void_p(b[idx_start:idx_end, :, :].ptr),
-                ctypes.c_void_p(a[idx_start:idx_end, :, :].ptr),
-                ctypes.c_void_p(adj_a[idx_start:idx_end, :, :].ptr),
-                alpha,
-                0.0,
-                True,
-                b.is_transposed,
-                allow_tf32x3_arith,
-                max_batch_count,
-            )
-            if not ret:
-                raise RuntimeError("adj_matmul failed.")
-        else:
-            ret = runtime.core.cutlass_gemm(
-                cc,
-                k,
-                m,
-                n,
-                type_typestr(a.dtype).encode(),
-                ctypes.c_void_p(b[idx_start:idx_end, :, :].ptr),
-                ctypes.c_void_p(adj_d[idx_start:idx_end, :, :].ptr),
-                ctypes.c_void_p(a[idx_start:idx_end, :, :].ptr),
-                ctypes.c_void_p(adj_a[idx_start:idx_end, :, :].ptr),
-                alpha,
-                0.0,
-                not b.is_transposed,
-                False,
-                allow_tf32x3_arith,
-                max_batch_count,
-            )
-            if not ret:
-                raise RuntimeError("adj_matmul failed.")
-
-        # adj_b
-        if not b.is_transposed:
-            ret = runtime.core.cutlass_gemm(
-                cc,
-                k,
-                n,
-                m,
-                type_typestr(a.dtype).encode(),
-                ctypes.c_void_p(a[idx_start:idx_end, :, :].ptr),
-                ctypes.c_void_p(adj_d[idx_start:idx_end, :, :].ptr),
-                ctypes.c_void_p(b[idx_start:idx_end, :, :].ptr),
-                ctypes.c_void_p(adj_b[idx_start:idx_end, :, :].ptr),
-                alpha,
-                0.0,
-                a.is_transposed,
-                True,
-                allow_tf32x3_arith,
-                max_batch_count,
-            )
-            if not ret:
-                raise RuntimeError("adj_matmul failed.")
-        else:
-            ret = runtime.core.cutlass_gemm(
-                cc,
-                n,
-                k,
-                m,
-                type_typestr(a.dtype).encode(),
-                ctypes.c_void_p(adj_d[idx_start:idx_end, :, :].ptr),
-                ctypes.c_void_p(a[idx_start:idx_end, :, :].ptr),
-                ctypes.c_void_p(b[idx_start:idx_end, :, :].ptr),
-                ctypes.c_void_p(adj_b[idx_start:idx_end, :, :].ptr),
-                alpha,
-                0.0,
-                False,
-                not a.is_transposed,
-                allow_tf32x3_arith,
-                max_batch_count,
-            )
-            if not ret:
-                raise RuntimeError("adj_matmul failed.")
-
-                # adj_c
-        ret = runtime.core.cutlass_gemm(
-            cc,
-            m,
-            n,
-            k,
-            type_typestr(a.dtype).encode(),
-            ctypes.c_void_p(a[idx_start:idx_end, :, :].ptr),
-            ctypes.c_void_p(b[idx_start:idx_end, :, :].ptr),
-            ctypes.c_void_p(adj_d[idx_start:idx_end, :, :].ptr),
-            ctypes.c_void_p(adj_c[idx_start:idx_end, :, :].ptr),
-            0.0,
-            beta,
-            not a.is_transposed,
-            not b.is_transposed,
-            allow_tf32x3_arith,
-            max_batch_count,
-        )
-        if not ret:
-            raise RuntimeError("adj_batched_matmul failed.")
-
-    idx_start = iters * max_batch_count
-
-    # adj_a
-    if not a.is_transposed:
-        ret = runtime.core.cutlass_gemm(
-            cc,
-            m,
-            k,
-            n,
-            type_typestr(a.dtype).encode(),
-            ctypes.c_void_p(adj_d[idx_start:, :, :].ptr),
-            ctypes.c_void_p(b[idx_start:, :, :].ptr),
-            ctypes.c_void_p(a[idx_start:, :, :].ptr),
-            ctypes.c_void_p(adj_a[idx_start:, :, :].ptr),
-            alpha,
-            0.0,
-            True,
-            b.is_transposed,
-            allow_tf32x3_arith,
-            remainder,
-        )
-        if not ret:
-            raise RuntimeError("adj_matmul failed.")
-    else:
-        ret = runtime.core.cutlass_gemm(
-            cc,
-            k,
-            m,
-            n,
-            type_typestr(a.dtype).encode(),
-            ctypes.c_void_p(b[idx_start:, :, :].ptr),
-            ctypes.c_void_p(adj_d[idx_start:, :, :].ptr),
-            ctypes.c_void_p(a[idx_start:, :, :].ptr),
-            ctypes.c_void_p(adj_a[idx_start:, :, :].ptr),
-            alpha,
-            0.0,
-            not b.is_transposed,
-            False,
-            allow_tf32x3_arith,
-            remainder,
-        )
-        if not ret:
-            raise RuntimeError("adj_matmul failed.")
-
-    # adj_b
-    if not b.is_transposed:
-        ret = runtime.core.cutlass_gemm(
-            cc,
-            k,
-            n,
-            m,
-            type_typestr(a.dtype).encode(),
-            ctypes.c_void_p(a[idx_start:, :, :].ptr),
-            ctypes.c_void_p(adj_d[idx_start:, :, :].ptr),
-            ctypes.c_void_p(b[idx_start:, :, :].ptr),
-            ctypes.c_void_p(adj_b[idx_start:, :, :].ptr),
-            alpha,
-            0.0,
-            a.is_transposed,
-            True,
-            allow_tf32x3_arith,
-            remainder,
-        )
-        if not ret:
-            raise RuntimeError("adj_matmul failed.")
-    else:
-        ret = runtime.core.cutlass_gemm(
-            cc,
-            n,
-            k,
-            m,
-            type_typestr(a.dtype).encode(),
-            ctypes.c_void_p(adj_d[idx_start:, :, :].ptr),
-            ctypes.c_void_p(a[idx_start:, :, :].ptr),
-            ctypes.c_void_p(b[idx_start:, :, :].ptr),
-            ctypes.c_void_p(adj_b[idx_start:, :, :].ptr),
-            alpha,
-            0.0,
-            False,
-            not a.is_transposed,
-            allow_tf32x3_arith,
-            remainder,
-        )
-        if not ret:
-            raise RuntimeError("adj_matmul failed.")
-
-            # adj_c
-    ret = runtime.core.cutlass_gemm(
-        cc,
-        m,
-        n,
-        k,
-        type_typestr(a.dtype).encode(),
-        ctypes.c_void_p(a[idx_start:, :, :].ptr),
-        ctypes.c_void_p(b[idx_start:, :, :].ptr),
-        ctypes.c_void_p(adj_d[idx_start:, :, :].ptr),
-        ctypes.c_void_p(adj_c[idx_start:, :, :].ptr),
-        0.0,
-        beta,
-        not a.is_transposed,
-        not b.is_transposed,
-        allow_tf32x3_arith,
-        remainder,
-    )
-    if not ret:
-        raise RuntimeError("adj_batched_matmul failed.")
-
-
-class HashGrid:
-    def __init__(self, dim_x, dim_y, dim_z, device=None):
-        """Class representing a hash grid object for accelerated point queries.
-
-        Attributes:
-            id: Unique identifier for this mesh object, can be passed to kernels.
-            device: Device this object lives on, all buffers must live on the same device.
-
-        Args:
-            dim_x (int): Number of cells in x-axis
-            dim_y (int): Number of cells in y-axis
-            dim_z (int): Number of cells in z-axis
-        """
-
-        from warp.context import runtime
-
-        self.device = runtime.get_device(device)
-
-        if self.device.is_cpu:
-            self.id = runtime.core.hash_grid_create_host(dim_x, dim_y, dim_z)
-        else:
-            self.id = runtime.core.hash_grid_create_device(self.device.context, dim_x, dim_y, dim_z)
-
-        # indicates whether the grid data has been reserved for use by a kernel
-        self.reserved = False
-
-    def build(self, points, radius):
-        """Updates the hash grid data structure.
-
-        This method rebuilds the underlying datastructure and should be called any time the set
-        of points changes.
-
-        Args:
-            points (:class:`warp.array`): Array of points of type :class:`warp.vec3`
-            radius (float): The cell size to use for bucketing points, cells are cubes with edges of this width.
-                            For best performance the radius used to construct the grid should match closely to
-                            the radius used when performing queries.
-        """
-
-        from warp.context import runtime
-
-        if self.device.is_cpu:
-            runtime.core.hash_grid_update_host(self.id, radius, ctypes.cast(points.ptr, ctypes.c_void_p), len(points))
-        else:
-            runtime.core.hash_grid_update_device(self.id, radius, ctypes.cast(points.ptr, ctypes.c_void_p), len(points))
-        self.reserved = True
-
-    def reserve(self, num_points):
-        from warp.context import runtime
-
-        if self.device.is_cpu:
-            runtime.core.hash_grid_reserve_host(self.id, num_points)
-        else:
-            runtime.core.hash_grid_reserve_device(self.id, num_points)
-        self.reserved = True
-
-    def __del__(self):
-        try:
-            from warp.context import runtime
-
-            if self.device.is_cpu:
-                runtime.core.hash_grid_destroy_host(self.id)
-            else:
-                # use CUDA context guard to avoid side effects during garbage collection
-                with self.device.context_guard:
-                    runtime.core.hash_grid_destroy_device(self.id)
-
-        except Exception:
-            pass
-
-
-class MarchingCubes:
-    def __init__(self, nx: int, ny: int, nz: int, max_verts: int, max_tris: int, device=None):
-        from warp.context import runtime
-
-        self.device = runtime.get_device(device)
-
-        if not self.device.is_cuda:
-            raise RuntimeError("Only CUDA devices are supported for marching cubes")
-
-        self.nx = nx
-        self.ny = ny
-        self.nz = nz
-
-        self.max_verts = max_verts
-        self.max_tris = max_tris
-
-        # bindings to warp.so
-        self.alloc = runtime.core.marching_cubes_create_device
-        self.alloc.argtypes = [ctypes.c_void_p]
-        self.alloc.restype = ctypes.c_uint64
-        self.free = runtime.core.marching_cubes_destroy_device
-
-        from warp.context import zeros
-
-        self.verts = zeros(max_verts, dtype=vec3, device=self.device)
-        self.indices = zeros(max_tris * 3, dtype=int, device=self.device)
-
-        # alloc surfacer
-        self.id = ctypes.c_uint64(self.alloc(self.device.context))
-
-    def __del__(self):
-        # use CUDA context guard to avoid side effects during garbage collection
-        with self.device.context_guard:
-            # destroy surfacer
-            self.free(self.id)
-
-    def resize(self, nx: int, ny: int, nz: int, max_verts: int, max_tris: int):
-        # actual allocations will be resized on next call to surface()
-        self.nx = nx
-        self.ny = ny
-        self.nz = nz
-        self.max_verts = max_verts
-        self.max_tris = max_tris
-
-    def surface(self, field: array(dtype=float), threshold: float):
-        from warp.context import runtime
-
-        # WP_API int marching_cubes_surface_host(const float* field, int nx, int ny, int nz, float threshold, wp::vec3* verts, int* triangles, int max_verts, int max_tris, int* out_num_verts, int* out_num_tris);
-        num_verts = ctypes.c_int(0)
-        num_tris = ctypes.c_int(0)
-
-        runtime.core.marching_cubes_surface_device.restype = ctypes.c_int
-
-        error = runtime.core.marching_cubes_surface_device(
-            self.id,
-            ctypes.cast(field.ptr, ctypes.c_void_p),
-            self.nx,
-            self.ny,
-            self.nz,
-            ctypes.c_float(threshold),
-            ctypes.cast(self.verts.ptr, ctypes.c_void_p),
-            ctypes.cast(self.indices.ptr, ctypes.c_void_p),
-            self.max_verts,
-            self.max_tris,
-            ctypes.c_void_p(ctypes.addressof(num_verts)),
-            ctypes.c_void_p(ctypes.addressof(num_tris)),
-        )
-
-        if error:
-            raise RuntimeError(
-                "Buffers may not be large enough, marching cubes required at least {num_verts} vertices, and {num_tris} triangles."
-            )
-
-        # resize the geometry arrays
-        self.verts.shape = (num_verts.value,)
-        self.indices.shape = (num_tris.value * 3,)
-
-        self.verts.size = num_verts.value
-        self.indices.size = num_tris.value * 3
 
 
 def type_is_generic(t):
@@ -3944,27 +2539,27 @@ def infer_argument_types(args, template_types, arg_names=None):
         arg = args[i]
         arg_type = type(arg)
         arg_name = arg_names[i] if arg_names else str(i)
-        if arg_type in warp.types.array_types:
+        if arg_type in warp2.types.array_types:
             arg_types.append(arg_type(dtype=arg.dtype, ndim=arg.ndim))
-        elif arg_type in warp.types.scalar_types:
+        elif arg_type in warp2.types.scalar_types:
             arg_types.append(arg_type)
         elif arg_type in [int, float]:
             # canonicalize type
-            arg_types.append(warp.types.type_to_warp(arg_type))
+            arg_types.append(warp2.types.type_to_warp(arg_type))
         elif hasattr(arg_type, "_wp_scalar_type_"):
             # vector/matrix type
             arg_types.append(arg_type)
-        elif issubclass(arg_type, warp.codegen.StructInstance):
+        elif issubclass(arg_type, warp2.codegen.StructInstance):
             # a struct
             arg_types.append(arg._cls)
-        # elif arg_type in [warp.types.launch_bounds_t, warp.types.shape_t, warp.types.range_t]:
+        # elif arg_type in [warp2.types.launch_bounds_t, warp2.types.shape_t, warp2.types.range_t]:
         #     arg_types.append(arg_type)
-        # elif arg_type in [warp.hash_grid_query_t, warp.mesh_query_aabb_t, warp.bvh_query_t]:
+        # elif arg_type in [warp2.hash_grid_query_t, warp2.mesh_query_aabb_t, warp2.bvh_query_t]:
         #     arg_types.append(arg_type)
         elif arg is None:
             # allow passing None for arrays
             t = template_types[i]
-            if warp.types.is_array(t):
+            if warp2.types.is_array(t):
                 arg_types.append(type(t)(dtype=t.dtype, ndim=t.ndim))
             else:
                 raise TypeError(f"Unable to infer the type of argument '{arg_name}', got None")
@@ -4047,8 +2642,8 @@ def get_type_code(arg_type):
         return f"fa{arg_type.ndim}{get_type_code(arg_type.dtype)}"
     elif isinstance(arg_type, indexedfabricarray):
         return f"ifa{arg_type.ndim}{get_type_code(arg_type.dtype)}"
-    elif isinstance(arg_type, warp.codegen.Struct):
-        return warp.codegen.make_full_qualified_name(arg_type.cls)
+    elif isinstance(arg_type, warp2.codegen.Struct):
+        return warp2.codegen.make_full_qualified_name(arg_type.cls)
     elif arg_type == Scalar:
         # generic scalar type
         return "s?"

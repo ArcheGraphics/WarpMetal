@@ -6,9 +6,9 @@
 
 from copy import copy as shallowcopy
 
-from warp import types
-from warp.codegen.adjoint import Adjoint
-from warp.module.context import get_module
+from warp2 import types
+from warp2.codegen.adjoint import Adjoint
+from warp2.module.context import get_module
 
 
 # caches source and compiled entry points for a kernel (will be populated after module loads)

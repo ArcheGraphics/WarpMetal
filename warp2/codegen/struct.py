@@ -6,11 +6,11 @@
 
 import ctypes
 
-from warp import types, float16
-from warp.codegen.codegen import make_full_qualified_name, get_annotations
-from warp.codegen.var import Var
-from warp.module.function import Function
-from warp.types import types_equal
+from warp2 import types, float16
+from warp2.codegen.codegen import make_full_qualified_name, get_annotations
+from warp2.codegen.var import Var
+from warp2.module.function import Function
+from warp2.types import types_equal
 
 
 class Struct:
@@ -238,7 +238,7 @@ class StructInstance:
                 setattr(self._ctype, name, var.type._type_())
             else:
                 if hasattr(value, "_type_"):
-                    # assigning warp type value (e.g.: wp.float32)
+                    # assigning warp2 type value (e.g.: wp.float32)
                     value = value.value
                 # float16 needs conversion to uint16 bits
                 if var.type == float16:

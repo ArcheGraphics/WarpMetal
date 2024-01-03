@@ -6,9 +6,9 @@
 from typing import Any, Callable, Tuple
 from copy import copy as shallowcopy
 
-from warp import types
-from warp.codegen.adjoint import Adjoint
-from warp.module.context import type_str
+from warp2 import types
+from warp2.codegen.adjoint import Adjoint
+from warp2.module.context import type_str
 
 
 def create_value_func(type):

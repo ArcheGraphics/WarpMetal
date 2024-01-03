@@ -1,9 +1,6 @@
-import ctypes
 import math
-from typing import Any
 
-import warp
-from warp.types import *
+from warp2.types import *
 
 
 class fabricbucket_t(ctypes.Structure):
@@ -60,18 +57,18 @@ def fabric_to_warp_dtype(type_info, attrib_name):
         raise RuntimeError(f"Attribute '{attrib_name}' cannot be used in Warp")
 
     base_type_dict = {
-        "b": warp.bool,  # boolean
-        "i1": warp.int8,
-        "i2": warp.int16,
-        "i4": warp.int32,
-        "i8": warp.int64,
-        "u1": warp.uint8,
-        "u2": warp.uint16,
-        "u4": warp.uint32,
-        "u8": warp.uint64,
-        "f2": warp.float16,
-        "f4": warp.float32,
-        "f8": warp.float64,
+        "b": warp2.bool,  # boolean
+        "i1": warp2.int8,
+        "i2": warp2.int16,
+        "i4": warp2.int32,
+        "i8": warp2.int64,
+        "u1": warp2.uint8,
+        "u2": warp2.uint16,
+        "u4": warp2.uint32,
+        "u8": warp2.uint64,
+        "f2": warp2.float16,
+        "f4": warp2.float32,
+        "f8": warp2.float64,
     }
 
     base_dtype = base_type_dict.get(type_info[1])
@@ -109,8 +106,6 @@ class fabricarray(noncontiguous_array_base[T]):
         super().__init__(ARRAY_TYPE_FABRIC)
 
         if data is not None:
-            from .context import runtime
-
             # ensure the attribute name was also specified
             if not isinstance(attrib, str):
                 raise ValueError(f"Invalid attribute name: {attrib}")
@@ -186,7 +181,7 @@ class fabricarray(noncontiguous_array_base[T]):
 
             if self.device.is_cuda:
                 # copy bucket info to device
-                with warp.ScopedStream(self.device.null_stream):
+                with warp2.ScopedStream(self.device.null_stream):
                     buckets_size = ctypes.sizeof(buckets)
                     buckets_ptr = self.device.allocator.alloc(buckets_size)
                     runtime.core.memcpy_h2d(self.device.context, buckets_ptr, ctypes.addressof(buckets), buckets_size)
@@ -241,7 +236,7 @@ class fabricarray(noncontiguous_array_base[T]):
         # member attributes available during code-gen (e.g.: d = arr.shape[0])
         # Note: we use a shared dict for all fabricarray instances
         if fabricarray._vars is None:
-            fabricarray._vars = {"size": warp.codegen.Var("size", uint64)}
+            fabricarray._vars = {"size": warp2.codegen.Var("size", uint64)}
         return fabricarray._vars
 
     def fill_(self, value):
@@ -307,7 +302,7 @@ class indexedfabricarray(noncontiguous_array_base[T]):
         # member attributes available during code-gen (e.g.: d = arr.shape[0])
         # Note: we use a shared dict for all indexedfabricarray instances
         if indexedfabricarray._vars is None:
-            indexedfabricarray._vars = {"size": warp.codegen.Var("size", uint64)}
+            indexedfabricarray._vars = {"size": warp2.codegen.Var("size", uint64)}
         return indexedfabricarray._vars
 
     def fill_(self, value):
