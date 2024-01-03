@@ -6,7 +6,6 @@
 
 from copy import copy as shallowcopy
 
-
 from warp.codegen.adjoint import Adjoint
 
 

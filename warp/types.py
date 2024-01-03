@@ -16,7 +16,7 @@ from typing import Any, Callable, Generic, List, Tuple, TypeVar, Union
 
 import numpy as np
 
-from warp.codegen.struct import Struct
+import warp
 
 # type hints
 Length = TypeVar("Length", bound=int)
@@ -173,34 +173,34 @@ def vector(length, dtype):
             return super().__setattr__(name, value)
 
         def __add__(self, y):
-            return
+            return warp.add(self, y)
 
         def __radd__(self, y):
-            return
+            return warp.add(self, y)
 
         def __sub__(self, y):
-            return
+            return warp.sub(self, y)
 
         def __rsub__(self, x):
-            return
+            return warp.sub(x, self)
 
         def __mul__(self, y):
-            return
+            return warp.mul(self, y)
 
         def __rmul__(self, x):
-            return
+            return warp.mul(x, self)
 
         def __truediv__(self, y):
-            return
+            return warp.div(self, y)
 
         def __rdiv__(self, x):
-            return
+            return warp.div(x, self)
 
         def __pos__(self):
-            return
+            return warp.pos(self)
 
         def __neg__(self):
-            return
+            return warp.neg(self)
 
         def __str__(self):
             return f"[{', '.join(map(str, self))}]"
@@ -289,40 +289,40 @@ def matrix(shape, dtype):
                 )
 
         def __add__(self, y):
-            return
+            return warp.add(self, y)
 
         def __radd__(self, y):
-            return
+            return warp.add(self, y)
 
         def __sub__(self, y):
-            return
+            return warp.sub(self, y)
 
         def __rsub__(self, x):
-            return
+            return warp.sub(x, self)
 
         def __mul__(self, y):
-            return
+            return warp.mul(self, y)
 
         def __rmul__(self, x):
-            return
+            return warp.mul(x, self)
 
         def __matmul__(self, y):
-            return
+            return warp.mul(self, y)
 
         def __rmatmul__(self, x):
-            return
+            return warp.mul(x, self)
 
         def __truediv__(self, y):
-            return
+            return warp.div(self, y)
 
         def __rdiv__(self, x):
-            return
+            return warp.div(x, self)
 
         def __pos__(self):
-            return
+            return warp.pos(self)
 
         def __neg__(self):
-            return
+            return warp.neg(self)
 
         def __str__(self):
             row_str = []
@@ -1042,7 +1042,7 @@ def type_ctype(dtype):
 
 
 def type_length(dtype):
-    if dtype == float or dtype == int or isinstance(dtype, Struct):
+    if dtype == float or dtype == int or isinstance(dtype, warp.codegen.Struct):
         return 1
     else:
         return dtype._length_
@@ -1055,7 +1055,7 @@ def type_scalar_type(dtype):
 def type_size_in_bytes(dtype):
     if dtype.__module__ == "ctypes":
         return ctypes.sizeof(dtype)
-    elif isinstance(dtype, Struct):
+    elif isinstance(dtype, warp.codegen.Struct):
         return ctypes.sizeof(dtype.ctype)
     elif dtype == float or dtype == int:
         return 4
@@ -1100,7 +1100,7 @@ def type_typestr(dtype):
         return "<i8"
     elif dtype == uint64:
         return "<u8"
-    elif isinstance(dtype, Struct):
+    elif isinstance(dtype, warp.codegen.Struct):
         return f"|V{ctypes.sizeof(dtype.ctype)}"
     elif issubclass(dtype, ctypes.Array):
         return type_typestr(dtype._wp_scalar_type_)
@@ -1116,7 +1116,7 @@ def type_repr(t):
         return str(f"vector(length={t._shape_[0]}, dtype={t._wp_scalar_type_})")
     if type_is_matrix(t):
         return str(f"matrix(shape=({t._shape_[0]}, {t._shape_[1]}), dtype={t._wp_scalar_type_})")
-    if isinstance(t, Struct):
+    if isinstance(t, warp.codegen.Struct):
         return type_repr(t.cls)
     if t in scalar_types:
         return t.__name__
@@ -1390,7 +1390,7 @@ class array(Array):
             dtype = np_dtype_to_warp_type.get(arr.dtype)
             if dtype is None:
                 raise RuntimeError(f"Unsupported input data dtype: {arr.dtype}")
-        elif isinstance(dtype, Struct):
+        elif isinstance(dtype, warp.codegen.Struct):
             if isinstance(data, np.ndarray):
                 # construct from numpy structured array
                 if data.dtype != dtype.numpy_dtype():
@@ -1591,7 +1591,7 @@ class array(Array):
 
         if self._array_interface is None:
             # get flat shape (including type shape)
-            if isinstance(self.dtype, Struct):
+            if isinstance(self.dtype, warp.codegen.Struct):
                 # struct
                 arr_shape = self.shape
                 arr_strides = self.strides
@@ -1789,24 +1789,6 @@ class array(Array):
 
         return self.ctype
 
-    def __matmul__(self, other):
-        """
-        Enables A @ B syntax for matrix multiplication
-        """
-        if self.ndim != 2 or other.ndim != 2:
-            raise RuntimeError(
-                "A has dim = {}, B has dim = {}. If multiplying with @, A and B must have dim = 2.".format(
-                    self.ndim, other.ndim
-                )
-            )
-
-        m = self.shape[0]
-        n = other.shape[1]
-        c = warp.zeros(shape=(m, n), dtype=self.dtype, device=self.device, requires_grad=True)
-        d = warp.zeros(shape=(m, n), dtype=self.dtype, device=self.device, requires_grad=True)
-        matmul(self, other, c, d, device=self.device)
-        return d
-
     @property
     def grad(self):
         return self._grad
@@ -1904,7 +1886,7 @@ class array(Array):
 
         # try to convert the given value to the array dtype
         try:
-            if isinstance(self.dtype, Struct):
+            if isinstance(self.dtype, warp.codegen.Struct):
                 if isinstance(value, self.dtype.cls):
                     cvalue = value.__ctype__()
                 elif value == 0:
@@ -1966,7 +1948,7 @@ class array(Array):
             return np.array(a, copy=False)
         else:
             # return an empty numpy array with the correct dtype and shape
-            if isinstance(self.dtype, Struct):
+            if isinstance(self.dtype, warp.codegen.Struct):
                 npdtype = self.dtype.numpy_dtype()
                 npshape = self.shape
             elif issubclass(self.dtype, ctypes.Array):
@@ -1995,7 +1977,7 @@ class array(Array):
                 "Accessing array memory through a ctypes ptr is only supported for contiguous CPU arrays."
             )
 
-        if isinstance(self.dtype, Struct):
+        if isinstance(self.dtype, warp.codegen.Struct):
             p = ctypes.cast(self.ptr, ctypes.POINTER(self.dtype.ctype))
         else:
             p = ctypes.cast(self.ptr, ctypes.POINTER(self.dtype._type_))
@@ -2009,7 +1991,7 @@ class array(Array):
         """Returns a flattened list of items in the array as a Python list."""
         a = self.numpy()
 
-        if isinstance(self.dtype, Struct):
+        if isinstance(self.dtype, warp.codegen.Struct):
             # struct
             a = a.flatten()
             data = a.ctypes.data
@@ -2283,7 +2265,7 @@ class noncontiguous_array_base(Generic[T]):
 
         # try to convert the given value to the array dtype
         try:
-            if isinstance(self.dtype, Struct):
+            if isinstance(self.dtype, warp.codegen.Struct):
                 if isinstance(value, self.dtype.cls):
                     cvalue = value.__ctype__()
                 elif value == 0:
@@ -2567,7 +2549,7 @@ def infer_argument_types(args, template_types, arg_names=None):
         elif hasattr(arg_type, "_wp_scalar_type_"):
             # vector/matrix type
             arg_types.append(arg_type)
-        elif issubclass(arg_type, StructInstance):
+        elif issubclass(arg_type, warp.codegen.StructInstance):
             # a struct
             arg_types.append(arg._cls)
         # elif arg_type in [warp.types.launch_bounds_t, warp.types.shape_t, warp.types.range_t]:
@@ -2660,7 +2642,7 @@ def get_type_code(arg_type):
         return f"fa{arg_type.ndim}{get_type_code(arg_type.dtype)}"
     elif isinstance(arg_type, indexedfabricarray):
         return f"ifa{arg_type.ndim}{get_type_code(arg_type.dtype)}"
-    elif isinstance(arg_type, Struct):
+    elif isinstance(arg_type, warp.codegen.Struct):
         return warp.codegen.make_full_qualified_name(arg_type.cls)
     elif arg_type == Scalar:
         # generic scalar type
