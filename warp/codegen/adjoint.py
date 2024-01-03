@@ -15,8 +15,8 @@ from warp.codegen.block import Block
 from warp.codegen.reference import is_reference, Reference
 from warp.codegen.struct import Struct
 from warp.codegen.var import Var
-from warp.function import Function
-from warp.module import ModuleBuilder
+from warp.module.function import Function
+from warp.module.module import ModuleBuilder
 
 
 class WarpCodegenError(RuntimeError):
