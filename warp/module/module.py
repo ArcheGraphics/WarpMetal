@@ -10,6 +10,7 @@ import os
 from typing import Mapping, Any
 
 from warp import config, types
+from warp.codegen import codegen
 from warp.codegen.struct import Struct
 from warp.module.function import Function
 from warp.module.kernel_hooks import KernelHooks
@@ -96,34 +97,34 @@ class ModuleBuilder:
 
         # code-gen structs
         for struct in self.structs.keys():
-            source += warp.codegen.codegen_struct(struct)
+            source += codegen.codegen_struct(struct)
 
         # code-gen all imported functions
         for func in self.functions.keys():
             if func.native_snippet is None:
-                source += warp.codegen.codegen_func(
+                source += codegen.codegen_func(
                     func.adj, c_func_name=func.native_func, device=device, options=self.options
                 )
             else:
-                source += warp.codegen.codegen_snippet(
+                source += codegen.codegen_snippet(
                     func.adj, name=func.key, snippet=func.native_snippet, adj_snippet=func.adj_native_snippet
                 )
 
         for kernel in self.module.kernels.values():
             # each kernel gets an entry point in the module
             if not kernel.is_generic:
-                source += warp.codegen.codegen_kernel(kernel, device=device, options=self.options)
-                source += warp.codegen.codegen_module(kernel, device=device)
+                source += codegen.codegen_kernel(kernel, device=device, options=self.options)
+                source += codegen.codegen_module(kernel, device=device)
             else:
                 for k in kernel.overloads.values():
-                    source += warp.codegen.codegen_kernel(k, device=device, options=self.options)
-                    source += warp.codegen.codegen_module(k, device=device)
+                    source += codegen.codegen_kernel(k, device=device, options=self.options)
+                    source += codegen.codegen_module(k, device=device)
 
         # add headers
         if device == "cpu":
-            source = warp.codegen.cpu_module_header + source
+            source = codegen.cpu_module_header + source
         else:
-            source = warp.codegen.cuda_module_header + source
+            source = codegen.cuda_module_header + source
 
         return source
 

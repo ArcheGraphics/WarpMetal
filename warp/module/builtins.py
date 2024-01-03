@@ -4,13 +4,10 @@
 #  personal capacity and am not conveying any rights to any intellectual
 #  property of any third parties.
 
-import builtins
-from typing import Any, Callable, Tuple
-
 from warp.types import *
 
-from .context import add_builtin
-from ..codegen.reference import Reference
+from warp.module.context import add_builtin
+from warp.codegen.reference import Reference
 
 
 def sametype_value_func(default):

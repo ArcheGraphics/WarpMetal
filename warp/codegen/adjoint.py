@@ -11,12 +11,17 @@ import builtins
 import sys
 from typing import List, Any, Callable
 
+from warp import types, config
 from warp.codegen.block import Block
-from warp.codegen.reference import is_reference, Reference
+from warp.codegen.codegen import compute_type_str
+from warp.codegen.reference import is_reference, Reference, strip_reference
 from warp.codegen.struct import Struct
 from warp.codegen.var import Var
+from warp.module.context import builtin_functions
 from warp.module.function import Function
 from warp.module.module import ModuleBuilder
+from warp.types import types_equal, type_repr, type_is_value, type_scalar_type, type_length, type_is_vector, is_array, \
+    type_is_matrix
 
 
 class WarpCodegenError(RuntimeError):
@@ -79,6 +84,10 @@ comparison_chain_strings = [
     builtin_operators[ast.Eq],
     builtin_operators[ast.NotEq],
 ]
+
+
+def op_str_is_chainable(op: str) -> builtins.bool:
+    return op in comparison_chain_strings
 
 
 def format_template(template, input_vars, output_var):
@@ -315,7 +324,7 @@ class Adjoint:
             for a in self.args:
                 if isinstance(a.type, Struct):
                     builder.build_struct_recursive(a.type)
-                elif isinstance(a.type, warp.types.array) and isinstance(a.type.dtype, Struct):
+                elif isinstance(a.type, types.array) and isinstance(a.type.dtype, Struct):
                     builder.build_struct_recursive(a.type.dtype)
 
     def indent(self):
@@ -416,7 +425,7 @@ class Adjoint:
         return output
 
     def resolve_func(adj, func, args, min_outputs, templates, kwds):
-        arg_types = [strip_reference(a.type) for a in args if not isinstance(a, warp.context.Function)]
+        arg_types = [strip_reference(a.type) for a in args if not isinstance(a, Function)]
 
         if not func.is_builtin():
             # user-defined function
@@ -442,7 +451,7 @@ class Adjoint:
                                 continue
 
                             # handle function refs as a special case
-                            if arg_type == Callable and type(args[i]) is warp.context.Function:
+                            if arg_type == Callable and type(args[i]) is Function:
                                 continue
 
                             if arg_type == Reference and is_reference(args[i].type):
@@ -491,7 +500,7 @@ class Adjoint:
 
                 arg_types.append(type_repr(arg_type))
 
-            if isinstance(x, warp.context.Function):
+            if isinstance(x, Function):
                 arg_types.append("function")
 
         raise WarpCodegenError(
@@ -515,7 +524,7 @@ class Adjoint:
             adj.builder.build_function(func)
 
         # evaluate the function type based on inputs
-        arg_types = [strip_reference(a.type) for a in args if not isinstance(a, warp.context.Function)]
+        arg_types = [strip_reference(a.type) for a in args if not isinstance(a, Function)]
         return_type = func.value_func(arg_types, kwds, templates)
 
         func_name = compute_type_str(func.native_func, templates)
@@ -587,8 +596,10 @@ class Adjoint:
 
         return output
 
-    def add_builtin_call(adj, func_name, args, min_outputs=None, templates=[], kwds=None):
-        func = warp.context.builtin_functions[func_name]
+    def add_builtin_call(adj, func_name, args, min_outputs=None, templates=None, kwds=None):
+        if templates is None:
+            templates = []
+        func = builtin_functions[func_name]
         return adj.add_call(func, args, min_outputs, templates, kwds)
 
     def add_return(adj, var):
@@ -863,7 +874,7 @@ class Adjoint:
         if obj is None:
             raise WarpCodegenKeyError("Referencing undefined symbol: " + str(node.id))
 
-        if warp.types.is_value(obj):
+        if types.is_value(obj):
             # evaluate constant
             out = adj.add_constant(obj)
             adj.symbols[node.id] = out
@@ -908,7 +919,7 @@ class Adjoint:
             if isinstance(aggregate, types.ModuleType) or isinstance(aggregate, type):
                 out = getattr(aggregate, node.attr)
 
-                if warp.types.is_value(out):
+                if types.is_value(out):
                     return adj.add_constant(out)
 
                 return out
@@ -1018,7 +1029,7 @@ class Adjoint:
             var2 = adj.symbols[sym]
 
             if var1 != var2:
-                if warp.config.verbose and not adj.custom_reverse_mode:
+                if config.verbose and not adj.custom_reverse_mode:
                     lineno = adj.lineno + adj.fun_lineno
                     line = adj.source.splitlines()[adj.lineno]
                     msg = f'Warning: detected mutated variable {sym} during a dynamic for-loop in function "{adj.fun_name}" at {adj.filename}:{lineno}: this may not be a differentiable operation.\n{line}\n'
@@ -1058,7 +1069,7 @@ class Adjoint:
         # try and resolve the expression to an object
         # e.g.: wp.constant in the globals scope
         obj, path = adj.resolve_static_expression(a)
-        return warp.types.is_int(obj), obj
+        return types.is_int(obj), obj
 
     # detects whether a loop contains a break (or continue) statement
     def contains_break(adj, body):
@@ -1128,14 +1139,14 @@ class Adjoint:
             ok_to_unroll = True
 
             if max_iters > max_unroll:
-                if warp.config.verbose:
+                if config.verbose:
                     print(
                         f"Warning: fixed-size loop count of {max_iters} is larger than the module 'max_unroll' limit of {max_unroll}, will generate dynamic loop."
                     )
                 ok_to_unroll = False
 
             elif adj.contains_break(loop.body):
-                if warp.config.verbose:
+                if config.verbose:
                     print("Warning: 'break' or 'continue' found in loop body, will generate dynamic loop.")
                 ok_to_unroll = False
 
@@ -1218,7 +1229,7 @@ class Adjoint:
         func, path = adj.resolve_static_expression(node.func)
         templates = []
 
-        if not isinstance(func, warp.context.Function):
+        if not isinstance(func, Function):
             if len(path) == 0:
                 raise WarpCodegenError(f"Unrecognized syntax for function call, path not valid: '{node.func}'")
 
@@ -1227,17 +1238,17 @@ class Adjoint:
             func = None
 
             # try and lookup function name in builtins (e.g.: using `dot` directly without wp prefix)
-            if attr in warp.context.builtin_functions:
-                func = warp.context.builtin_functions[attr]
+            if attr in builtin_functions:
+                func = builtin_functions[attr]
 
             # vector class type e.g.: wp.vec3f constructor
             if func is None and hasattr(caller, "_wp_generic_type_str_"):
                 templates = caller._wp_type_params_
-                func = warp.context.builtin_functions.get(caller._wp_constructor_)
+                func = builtin_functions.get(caller._wp_constructor_)
 
             # scalar class type e.g.: wp.int8 constructor
-            if func is None and hasattr(caller, "__name__") and caller.__name__ in warp.context.builtin_functions:
-                func = warp.context.builtin_functions.get(caller.__name__)
+            if func is None and hasattr(caller, "__name__") and caller.__name__ in builtin_functions:
+                func = builtin_functions.get(caller.__name__)
 
             # struct constructor
             if func is None and isinstance(caller, Struct):
@@ -1423,7 +1434,7 @@ class Adjoint:
 
                 adj.add_builtin_call("store", [attr, value])
 
-                if warp.config.verbose and not adj.custom_reverse_mode:
+                if config.verbose and not adj.custom_reverse_mode:
                     lineno = adj.lineno + adj.fun_lineno
                     line = adj.source.splitlines()[adj.lineno]
                     node_source = adj.get_node_source(lhs.value)
@@ -1480,7 +1491,7 @@ class Adjoint:
                 else:
                     adj.add_builtin_call("assign", [attr, rhs])
 
-                if warp.config.verbose and not adj.custom_reverse_mode:
+                if config.verbose and not adj.custom_reverse_mode:
                     lineno = adj.lineno + adj.fun_lineno
                     line = adj.source.splitlines()[adj.lineno]
                     msg = f'Warning: detected mutated struct {attr.label} during function "{adj.fun_name}" at {adj.filename}:{lineno}: this is a non-differentiable operation.\n{line}\n'
@@ -1581,7 +1592,7 @@ class Adjoint:
         # to variables you've declared inside that function:
         extract_contents = (
             lambda contents: contents
-            if isinstance(contents, warp.context.Function) or not callable(contents)
+            if isinstance(contents, Function) or not callable(contents)
             else contents
         )
         capturedvars = dict(

@@ -6,7 +6,11 @@
 
 import ctypes
 
+from warp import types, float16
+from warp.codegen.codegen import make_full_qualified_name, get_annotations
 from warp.codegen.var import Var
+from warp.module.function import Function
+from warp.types import types_equal
 
 
 class Struct:
@@ -22,8 +26,8 @@ class Struct:
 
         fields = []
         for label, var in self.vars.items():
-            if isinstance(var.type, array):
-                fields.append((label, array_t))
+            if isinstance(var.type, types.array):
+                fields.append((label, types.array_t))
             elif isinstance(var.type, Struct):
                 fields.append((label, var.type.ctype))
             elif issubclass(var.type, ctypes.Array):
@@ -38,7 +42,7 @@ class Struct:
         self.ctype = StructType
 
         # create default constructor (zero-initialize)
-        self.default_constructor = warp.context.Function(
+        self.default_constructor = Function(
             func=None,
             key=self.key,
             namespace="",
@@ -51,7 +55,7 @@ class Struct:
         # build a constructor that takes each param as a value
         input_types = {label: var.type for label, var in self.vars.items()}
 
-        self.value_constructor = warp.context.Function(
+        self.value_constructor = Function(
             func=None,
             key=self.key,
             namespace="",
@@ -100,14 +104,14 @@ class Struct:
         for name, var in self.vars.items():
             names.append(name)
             offsets.append(getattr(self.ctype, name).offset)
-            if isinstance(var.type, array):
+            if isinstance(var.type, types.array):
                 # array_t
-                formats.append(array_t.numpy_dtype())
+                formats.append(types.array_t.numpy_dtype())
             elif isinstance(var.type, Struct):
                 # nested struct
                 formats.append(var.type.numpy_dtype())
             elif issubclass(var.type, ctypes.Array):
-                scalar_typestr = type_typestr(var.type._wp_scalar_type_)
+                scalar_typestr = types.type_typestr(var.type._wp_scalar_type_)
                 if len(var.type._shape_) == 1:
                     # vector
                     formats.append(f"{var.type._length_}{scalar_typestr}")
@@ -116,7 +120,7 @@ class Struct:
                     formats.append(f"{var.type._shape_}{scalar_typestr}")
             else:
                 # scalar
-                formats.append(type_typestr(var.type))
+                formats.append(types.type_typestr(var.type))
 
         return {"names": names, "formats": formats, "offsets": offsets, "itemsize": ctypes.sizeof(self.ctype)}
 
@@ -130,12 +134,12 @@ class Struct:
 
         for name, var in self.vars.items():
             offset = getattr(self.ctype, name).offset
-            if isinstance(var.type, array):
+            if isinstance(var.type, types.array):
                 # We could reconstruct wp.array from array_t, but it's problematic.
                 # There's no guarantee that the original wp.array is still allocated and
                 # no easy way to make a backref.
                 # Instead, we just create a stub annotation, which is not a fully usable array object.
-                setattr(instance, name, array(dtype=var.type.dtype, ndim=var.type.ndim))
+                setattr(instance, name, types.array(dtype=var.type.dtype, ndim=var.type.ndim))
             elif isinstance(var.type, Struct):
                 # nested struct
                 value = var.type.from_ptr(ptr + offset)
@@ -147,8 +151,8 @@ class Struct:
             else:
                 # scalar
                 cvalue = ctypes.cast(ptr + offset, ctypes.POINTER(var.type._type_)).contents
-                if var.type == warp.float16:
-                    setattr(instance, name, half_bits_to_float(cvalue))
+                if var.type == float16:
+                    setattr(instance, name, types.half_bits_to_float(cvalue))
                 else:
                     setattr(instance, name, cvalue.value)
 
@@ -167,9 +171,9 @@ class StructInstance:
 
         # create Python attributes for each of the struct's variables
         for field, var in cls.vars.items():
-            if isinstance(var.type, warp.codegen.Struct):
+            if isinstance(var.type, Struct):
                 self.__dict__[field] = StructInstance(var.type, getattr(self._ctype, field))
-            elif isinstance(var.type, warp.types.array):
+            elif isinstance(var.type, types.array):
                 self.__dict__[field] = None
             else:
                 self.__dict__[field] = var.type()
@@ -181,16 +185,16 @@ class StructInstance:
         var = self._cls.vars[name]
 
         # update our ctype flat copy
-        if isinstance(var.type, array):
+        if isinstance(var.type, types.array):
             if value is None:
                 # create array with null pointer
-                setattr(self._ctype, name, array_t())
+                setattr(self._ctype, name, types.array_t())
             else:
                 # wp.array
-                assert isinstance(value, array)
+                assert isinstance(value, types.array)
                 assert types_equal(
                     value.dtype, var.type.dtype
-                ), f"assign to struct member variable {name} failed, expected type {type_repr(var.type.dtype)}, got type {type_repr(value.dtype)}"
+                ), f"assign to struct member variable {name} failed, expected type {types.type_repr(var.type.dtype)}, got type {types.type_repr(value.dtype)}"
                 setattr(self._ctype, name, value.__ctype__())
 
         elif isinstance(var.type, Struct):
@@ -237,8 +241,8 @@ class StructInstance:
                     # assigning warp type value (e.g.: wp.float32)
                     value = value.value
                 # float16 needs conversion to uint16 bits
-                if var.type == warp.float16:
-                    setattr(self._ctype, name, float_to_half_bits(value))
+                if var.type == float16:
+                    setattr(self._ctype, name, types.float_to_half_bits(value))
                 else:
                     setattr(self._ctype, name, value)
 
@@ -262,7 +266,7 @@ class StructInstance:
             # get the attribute value
             value = getattr(self._ctype, name)
 
-            if isinstance(var.type, array):
+            if isinstance(var.type, types.array):
                 # array_t
                 npvalue.append(value.numpy_value())
             elif isinstance(var.type, Struct):
@@ -277,8 +281,8 @@ class StructInstance:
                     npvalue.append([list(row) for row in value])
             else:
                 # scalar
-                if var.type == warp.float16:
-                    npvalue.append(half_bits_to_float(value))
+                if var.type == float16:
+                    npvalue.append(types.half_bits_to_float(value))
                 else:
                     npvalue.append(value)
 

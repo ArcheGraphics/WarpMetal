@@ -8,6 +8,7 @@ from copy import copy as shallowcopy
 
 from warp import types
 from warp.codegen.adjoint import Adjoint
+from warp.module.context import type_str
 
 
 def create_value_func(type):
