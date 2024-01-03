@@ -12,6 +12,7 @@ import sys
 from typing import Any, Callable, Tuple, List
 
 from warp import types
+from warp.codegen import codegen
 from warp.codegen.adjoint import Adjoint
 from warp.codegen.struct import Struct
 from warp.module.function import Function
@@ -64,7 +65,7 @@ def get_module(name):
 
 # decorator to register function, @func
 def func(f):
-    name = warp.codegen.make_full_qualified_name(f)
+    name = codegen.make_full_qualified_name(f)
 
     m = get_module(f.__module__)
     Function(
@@ -81,7 +82,7 @@ def func_native(snippet, adj_snippet=None):
     """
 
     def snippet_func(f):
-        name = warp.codegen.make_full_qualified_name(f)
+        name = codegen.make_full_qualified_name(f)
 
         m = get_module(f.__module__)
         func = Function(
@@ -258,7 +259,7 @@ def kernel(f=None, *, enable_backward=None):
         m = get_module(f.__module__)
         k = Kernel(
             func=f,
-            key=warp.codegen.make_full_qualified_name(f),
+            key=codegen.make_full_qualified_name(f),
             module=m,
             options=options,
         )
@@ -274,7 +275,7 @@ def kernel(f=None, *, enable_backward=None):
 # decorator to register struct, @struct
 def struct(c):
     m = get_module(c.__module__)
-    s = Struct(cls=c, key=warp.codegen.make_full_qualified_name(c), module=m)
+    s = Struct(cls=c, key=codegen.make_full_qualified_name(c), module=m)
 
     return s
 
