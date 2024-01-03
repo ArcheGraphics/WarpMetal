@@ -7,10 +7,12 @@
 import ast
 import inspect
 import textwrap
+import builtins
 from typing import List, Any, Callable
 
 from warp.codegen.block import Block
 from warp.codegen.reference import is_reference, Reference
+from warp.codegen.struct import Struct
 from warp.codegen.var import Var
 
 
