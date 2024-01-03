@@ -8,7 +8,7 @@ from warp.codegen.struct import Struct
 
 
 class Var:
-    def __init__(self, label, type, requires_grad=False, constant=None, prefix=True):
+    def __init__(self, label: str, type, requires_grad=False, constant=None, prefix=True):
         # convert built-in types to wp types
         if type == float:
             type = float32

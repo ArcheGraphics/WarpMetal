@@ -16,6 +16,7 @@ from warp.codegen.reference import is_reference, Reference
 from warp.codegen.struct import Struct
 from warp.codegen.var import Var
 from warp.function import Function
+from warp.module import ModuleBuilder
 
 
 class WarpCodegenError(RuntimeError):
@@ -36,6 +37,7 @@ class WarpCodegenAttributeError(AttributeError):
 class WarpCodegenKeyError(KeyError):
     def __init__(self, message):
         super().__init__(message)
+
 
 # map operator to function name
 builtin_operators = {}
@@ -79,9 +81,93 @@ comparison_chain_strings = [
 ]
 
 
+def format_template(template, input_vars, output_var):
+    # code generation methods
+
+    # output var is always the 0th index
+    args = [output_var] + input_vars
+    s = template.format(*args)
+
+    return s
+
+
+def format_args(prefix: str, args):
+    # generates a list of formatted args
+
+    arg_strs = []
+
+    for a in args:
+        if isinstance(a, Function):
+            # functions don't have a var_ prefix so strip it off here
+            if prefix == "var":
+                arg_strs.append(a.key)
+            else:
+                arg_strs.append(f"{prefix}_{a.key}")
+        elif is_reference(a.type):
+            arg_strs.append(f"{prefix}_{a}")
+        elif isinstance(a, Var):
+            arg_strs.append(a.emit(prefix))
+        else:
+            raise WarpCodegenTypeError(f"Arguments must be variables or functions, got {type(a)}")
+
+    return arg_strs
+
+
+def format_forward_call_args(args, use_initializer_list):
+    # generates argument string for a forward function call
+
+    arg_str = ", ".join(format_args("var", args))
+    if use_initializer_list:
+        return f"{{{arg_str}}}"
+    return arg_str
+
+
+def format_reverse_call_args(
+        args_var,
+        args,
+        args_out,
+        use_initializer_list,
+        has_output_args=True,
+):
+    # generates argument string for a reverse function call
+
+    formatted_var = format_args("var", args_var)
+    formatted_out = []
+    if has_output_args and len(args_out) > 1:
+        formatted_out = format_args("var", args_out)
+    formatted_var_adj = format_args(
+        "&adj" if use_initializer_list else "adj",
+        args,
+    )
+    formatted_out_adj = format_args("adj", args_out)
+
+    if len(formatted_var_adj) == 0 and len(formatted_out_adj) == 0:
+        # there are no adjoint arguments, so we don't need to call the reverse function
+        return None
+
+    if use_initializer_list:
+        var_str = f"{{{', '.join(formatted_var)}}}"
+        out_str = f"{{{', '.join(formatted_out)}}}"
+        adj_str = f"{{{', '.join(formatted_var_adj)}}}"
+        out_adj_str = ", ".join(formatted_out_adj)
+        if len(args_out) > 1:
+            arg_str = ", ".join([var_str, out_str, adj_str, out_adj_str])
+        else:
+            arg_str = ", ".join([var_str, adj_str, out_adj_str])
+    else:
+        arg_str = ", ".join(formatted_var + formatted_out + formatted_var_adj + formatted_out_adj)
+    return arg_str
+
+
 class Adjoint:
     # Source code transformer, this class takes a Python function and
     # generates forward and backward SSA forms of the function instructions
+
+    args: List[Var]
+    builder: ModuleBuilder
+
+    blocks: List[Block]
+    label_count: int
 
     def __init__(
             self,
@@ -94,14 +180,11 @@ class Adjoint:
             custom_reverse_num_input_args=-1,
             transformers=None,
     ):
-        self.label_count = None
         self.indentation = None
         self.loop_blocks = None
-        self.blocks = None
         self.loop_symbols = None
         self.return_var = None
         self.variables = None
-        self.builder = None
         if transformers is None:
             transformers = []
         self.func = func
@@ -150,13 +233,13 @@ class Adjoint:
         if overload_annotations is None:
             # use source-level argument annotations
             if len(argspec.annotations) < len(argspec.args):
-                raise WarpCodegenError(f"Incomplete argument annotations on function {adj.fun_name}")
+                raise WarpCodegenError(f"Incomplete argument annotations on function {self.fun_name}")
             self.arg_types = argspec.annotations
         else:
             # use overload argument annotations
             for arg_name in argspec.args:
                 if arg_name not in overload_annotations:
-                    raise WarpCodegenError(f"Incomplete overload annotations for function {adj.fun_name}")
+                    raise WarpCodegenError(f"Incomplete overload annotations for function {self.fun_name}")
             self.arg_types = overload_annotations.copy()
 
         self.args = []
@@ -184,7 +267,7 @@ class Adjoint:
         self.skip_build = False
 
     # generate function ssa form and adjoint
-    def build(self, builder):
+    def build(self, builder: ModuleBuilder):
         if self.skip_build:
             return
 
@@ -235,106 +318,35 @@ class Adjoint:
                 elif isinstance(a.type, warp.types.array) and isinstance(a.type.dtype, Struct):
                     builder.build_struct_recursive(a.type.dtype)
 
-    # code generation methods
-    def format_template(adj, template, input_vars, output_var):
-        # output var is always the 0th index
-        args = [output_var] + input_vars
-        s = template.format(*args)
+    def indent(self):
+        self.indentation = self.indentation + "    "
 
-        return s
+    def dedent(self):
+        self.indentation = self.indentation[:-4]
 
-    # generates a list of formatted args
-    def format_args(adj, prefix, args):
-        arg_strs = []
-
-        for a in args:
-            if isinstance(a, Function):
-                # functions don't have a var_ prefix so strip it off here
-                if prefix == "var":
-                    arg_strs.append(a.key)
-                else:
-                    arg_strs.append(f"{prefix}_{a.key}")
-            elif is_reference(a.type):
-                arg_strs.append(f"{prefix}_{a}")
-            elif isinstance(a, Var):
-                arg_strs.append(a.emit(prefix))
-            else:
-                raise WarpCodegenTypeError(f"Arguments must be variables or functions, got {type(a)}")
-
-        return arg_strs
-
-    # generates argument string for a forward function call
-    def format_forward_call_args(self, args, use_initializer_list):
-        arg_str = ", ".join(self.format_args("var", args))
-        if use_initializer_list:
-            return f"{{{arg_str}}}"
-        return arg_str
-
-    # generates argument string for a reverse function call
-    def format_reverse_call_args(
-            adj,
-            args_var,
-            args,
-            args_out,
-            use_initializer_list,
-            has_output_args=True,
-    ):
-        formatted_var = adj.format_args("var", args_var)
-        formatted_out = []
-        if has_output_args and len(args_out) > 1:
-            formatted_out = adj.format_args("var", args_out)
-        formatted_var_adj = adj.format_args(
-            "&adj" if use_initializer_list else "adj",
-            args,
-        )
-        formatted_out_adj = adj.format_args("adj", args_out)
-
-        if len(formatted_var_adj) == 0 and len(formatted_out_adj) == 0:
-            # there are no adjoint arguments, so we don't need to call the reverse function
-            return None
-
-        if use_initializer_list:
-            var_str = f"{{{', '.join(formatted_var)}}}"
-            out_str = f"{{{', '.join(formatted_out)}}}"
-            adj_str = f"{{{', '.join(formatted_var_adj)}}}"
-            out_adj_str = ", ".join(formatted_out_adj)
-            if len(args_out) > 1:
-                arg_str = ", ".join([var_str, out_str, adj_str, out_adj_str])
-            else:
-                arg_str = ", ".join([var_str, adj_str, out_adj_str])
-        else:
-            arg_str = ", ".join(formatted_var + formatted_out + formatted_var_adj + formatted_out_adj)
-        return arg_str
-
-    def indent(adj):
-        adj.indentation = adj.indentation + "    "
-
-    def dedent(adj):
-        adj.indentation = adj.indentation[:-4]
-
-    def begin_block(adj):
+    def begin_block(self):
         b = Block()
 
         # give block a unique id
-        b.label = adj.label_count
-        adj.label_count += 1
+        b.label = self.label_count
+        self.label_count += 1
 
-        adj.blocks.append(b)
+        self.blocks.append(b)
         return b
 
-    def end_block(adj):
-        return adj.blocks.pop()
+    def end_block(self):
+        return self.blocks.pop()
 
-    def add_var(adj, type=None, constant=None):
-        index = len(adj.variables)
+    def add_var(self, type=None, constant=None):
+        index = len(self.variables)
         name = str(index)
 
         # allocate new variable
         v = Var(name, type=type, constant=constant)
 
-        adj.variables.append(v)
+        self.variables.append(v)
 
-        adj.blocks[-1].vars.append(v)
+        self.blocks[-1].vars.append(v)
 
         return v
 
