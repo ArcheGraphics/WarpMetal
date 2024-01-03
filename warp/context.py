@@ -1238,16 +1238,10 @@ class Module:
     def register_struct(self, struct):
         self.structs[struct.key] = struct
 
-        # for a reload of module on next launch
-        self.unload()
-
     def register_kernel(self, kernel):
         self.kernels[kernel.key] = kernel
 
         self.find_references(kernel.adj)
-
-        # for a reload of module on next launch
-        self.unload()
 
     def register_function(self, func, skip_adding_overload=False):
         if func.key not in self.functions:
@@ -1273,9 +1267,6 @@ class Module:
                 func_existing.add_overload(func)
 
         self.find_references(func.adj)
-
-        # for a reload of module on next launch
-        self.unload()
 
     def generate_unique_kernel_key(self, key):
         unique_key = f"{key}_{self.count}"
@@ -1409,7 +1400,8 @@ class Module:
 
     def codegen(self):
         builder = ModuleBuilder(self, self.options)
-        builder.codegen("cpu")
+        source = builder.codegen("cpu")
+        print(source)
 
 
 # -------------------------------------------
