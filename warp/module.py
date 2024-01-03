@@ -7,6 +7,7 @@
 import ctypes
 import hashlib
 import os
+from typing import Mapping, Any
 
 from warp import config
 from warp.codegen.struct import Struct
@@ -262,7 +263,7 @@ class Module:
 
         # scan for structs
         for arg in adj.args:
-            if isinstance(arg.type, warp.codegen.Struct) and arg.type.module is not None:
+            if isinstance(arg.type, Struct) and arg.type.module is not None:
                 add_ref(arg.type.module)
 
     def hash_module(self):
@@ -275,7 +276,7 @@ class Module:
             return getattr(obj, "__annotations__", {})
 
         def get_type_name(type_hint):
-            if isinstance(type_hint, warp.codegen.Struct):
+            if isinstance(type_hint, Struct):
                 return get_type_name(type_hint.cls)
             return type_hint
 

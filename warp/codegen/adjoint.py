@@ -8,12 +8,14 @@ import ast
 import inspect
 import textwrap
 import builtins
+import sys
 from typing import List, Any, Callable
 
 from warp.codegen.block import Block
 from warp.codegen.reference import is_reference, Reference
 from warp.codegen.struct import Struct
 from warp.codegen.var import Var
+from warp.function import Function
 
 
 class WarpCodegenError(RuntimeError):
@@ -35,13 +37,54 @@ class WarpCodegenKeyError(KeyError):
     def __init__(self, message):
         super().__init__(message)
 
+# map operator to function name
+builtin_operators = {}
+
+# see https://www.ics.uci.edu/~pattis/ICS-31/lectures/opexp.pdf for a
+# nice overview of python operators
+
+builtin_operators[ast.Add] = "add"
+builtin_operators[ast.Sub] = "sub"
+builtin_operators[ast.Mult] = "mul"
+builtin_operators[ast.MatMult] = "mul"
+builtin_operators[ast.Div] = "div"
+builtin_operators[ast.FloorDiv] = "floordiv"
+builtin_operators[ast.Pow] = "pow"
+builtin_operators[ast.Mod] = "mod"
+builtin_operators[ast.UAdd] = "pos"
+builtin_operators[ast.USub] = "neg"
+builtin_operators[ast.Not] = "unot"
+
+builtin_operators[ast.Gt] = ">"
+builtin_operators[ast.Lt] = "<"
+builtin_operators[ast.GtE] = ">="
+builtin_operators[ast.LtE] = "<="
+builtin_operators[ast.Eq] = "=="
+builtin_operators[ast.NotEq] = "!="
+
+builtin_operators[ast.BitAnd] = "bit_and"
+builtin_operators[ast.BitOr] = "bit_or"
+builtin_operators[ast.BitXor] = "bit_xor"
+builtin_operators[ast.Invert] = "invert"
+builtin_operators[ast.LShift] = "lshift"
+builtin_operators[ast.RShift] = "rshift"
+
+comparison_chain_strings = [
+    builtin_operators[ast.Gt],
+    builtin_operators[ast.Lt],
+    builtin_operators[ast.LtE],
+    builtin_operators[ast.GtE],
+    builtin_operators[ast.Eq],
+    builtin_operators[ast.NotEq],
+]
+
 
 class Adjoint:
     # Source code transformer, this class takes a Python function and
     # generates forward and backward SSA forms of the function instructions
 
     def __init__(
-            adj,
+            self,
             func,
             overload_annotations=None,
             is_user_function=False,
@@ -49,46 +92,56 @@ class Adjoint:
             skip_reverse_codegen=False,
             custom_reverse_mode=False,
             custom_reverse_num_input_args=-1,
-            transformers: List[ast.NodeTransformer] = [],
+            transformers=None,
     ):
-        adj.func = func
+        self.label_count = None
+        self.indentation = None
+        self.loop_blocks = None
+        self.blocks = None
+        self.loop_symbols = None
+        self.return_var = None
+        self.variables = None
+        self.builder = None
+        if transformers is None:
+            transformers = []
+        self.func = func
 
-        adj.is_user_function = is_user_function
+        self.is_user_function = is_user_function
 
         # whether the generation of the forward code is skipped for this function
-        adj.skip_forward_codegen = skip_forward_codegen
+        self.skip_forward_codegen = skip_forward_codegen
         # whether the generation of the adjoint code is skipped for this function
-        adj.skip_reverse_codegen = skip_reverse_codegen
+        self.skip_reverse_codegen = skip_reverse_codegen
 
         # build AST from function object
-        adj.source = inspect.getsource(func)
+        self.source = inspect.getsource(func)
 
         # get source code lines and line number where function starts
-        adj.raw_source, adj.fun_lineno = inspect.getsourcelines(func)
+        self.raw_source, self.fun_lineno = inspect.getsourcelines(func)
 
         # keep track of line number in function code
-        adj.lineno = None
+        self.lineno = None
 
         # ensures that indented class methods can be parsed as kernels
-        adj.source = textwrap.dedent(adj.source)
+        self.source = textwrap.dedent(self.source)
 
         # extract name of source file
-        adj.filename = inspect.getsourcefile(func) or "unknown source file"
+        self.filename = inspect.getsourcefile(func) or "unknown source file"
 
         # build AST and apply node transformers
-        adj.tree = ast.parse(adj.source)
-        adj.transformers = transformers
+        self.tree = ast.parse(self.source)
+        self.transformers = transformers
         for transformer in transformers:
-            adj.tree = transformer.visit(adj.tree)
+            self.tree = transformer.visit(self.tree)
 
-        adj.fun_name = adj.tree.body[0].name
+        self.fun_name = self.tree.body[0].name
 
         # whether the forward code shall be used for the reverse pass and a custom
         # function signature is applied to the reverse version of the function
-        adj.custom_reverse_mode = custom_reverse_mode
+        self.custom_reverse_mode = custom_reverse_mode
         # the number of function arguments that pertain to the forward function
         # input arguments (i.e. the number of arguments that are not adjoint arguments)
-        adj.custom_reverse_num_input_args = custom_reverse_num_input_args
+        self.custom_reverse_num_input_args = custom_reverse_num_input_args
 
         # parse argument types
         argspec = inspect.getfullargspec(func)
@@ -98,29 +151,29 @@ class Adjoint:
             # use source-level argument annotations
             if len(argspec.annotations) < len(argspec.args):
                 raise WarpCodegenError(f"Incomplete argument annotations on function {adj.fun_name}")
-            adj.arg_types = argspec.annotations
+            self.arg_types = argspec.annotations
         else:
             # use overload argument annotations
             for arg_name in argspec.args:
                 if arg_name not in overload_annotations:
                     raise WarpCodegenError(f"Incomplete overload annotations for function {adj.fun_name}")
-            adj.arg_types = overload_annotations.copy()
+            self.arg_types = overload_annotations.copy()
 
-        adj.args = []
-        adj.symbols = {}
+        self.args = []
+        self.symbols = {}
 
-        for name, type in adj.arg_types.items():
+        for name, type in self.arg_types.items():
             # skip return hint
             if name == "return":
                 continue
 
             # add variable for argument
             arg = Var(name, type, False)
-            adj.args.append(arg)
+            self.args.append(arg)
 
             # pre-populate symbol dictionary with function argument names
             # this is to avoid registering false references to overshadowed modules
-            adj.symbols[name] = arg
+            self.symbols[name] = arg
 
         # There are cases where a same module might be rebuilt multiple times,
         # for example when kernels are nested inside of functions, or when
@@ -128,55 +181,55 @@ class Adjoint:
         # avoid rebuilding kernels but some corner cases seem to depend on it,
         # so we only avoid rebuilding kernels that errored out to give a chance
         # for unit testing errors being spit out from kernels.
-        adj.skip_build = False
+        self.skip_build = False
 
     # generate function ssa form and adjoint
-    def build(adj, builder):
-        if adj.skip_build:
+    def build(self, builder):
+        if self.skip_build:
             return
 
-        adj.builder = builder
+        self.builder = builder
 
-        adj.symbols = {}  # map from symbols to adjoint variables
-        adj.variables = []  # list of local variables (in order)
+        self.symbols = {}  # map from symbols to adjoint variables
+        self.variables = []  # list of local variables (in order)
 
-        adj.return_var = None  # return type for function or kernel
-        adj.loop_symbols = []  # symbols at the start of each loop
+        self.return_var = None  # return type for function or kernel
+        self.loop_symbols = []  # symbols at the start of each loop
 
         # blocks
-        adj.blocks = [Block()]
-        adj.loop_blocks = []
+        self.blocks = [Block()]
+        self.loop_blocks = []
 
         # holds current indent level
-        adj.indentation = ""
+        self.indentation = ""
 
         # used to generate new label indices
-        adj.label_count = 0
+        self.label_count = 0
 
         # update symbol map for each argument
-        for a in adj.args:
-            adj.symbols[a.label] = a
+        for a in self.args:
+            self.symbols[a.label] = a
 
         # recursively evaluate function body
         try:
-            adj.eval(adj.tree.body[0])
+            self.eval(self.tree.body[0])
         except Exception as e:
             try:
                 if isinstance(e, KeyError) and getattr(e.args[0], "__module__", None) == "ast":
                     msg = f'Syntax error: unsupported construct "ast.{e.args[0].__name__}"'
                 else:
                     msg = "Error"
-                lineno = adj.lineno + adj.fun_lineno
-                line = adj.source.splitlines()[adj.lineno]
-                msg += f' while parsing function "{adj.fun_name}" at {adj.filename}:{lineno}:\n{line}\n'
+                lineno = self.lineno + self.fun_lineno
+                line = self.source.splitlines()[self.lineno]
+                msg += f' while parsing function "{self.fun_name}" at {self.filename}:{lineno}:\n{line}\n'
                 ex, data, traceback = sys.exc_info()
                 e = ex(";".join([msg] + [str(a) for a in data.args])).with_traceback(traceback)
             finally:
-                adj.skip_build = True
+                self.skip_build = True
                 raise e
 
         if builder is not None:
-            for a in adj.args:
+            for a in self.args:
                 if isinstance(a.type, Struct):
                     builder.build_struct_recursive(a.type)
                 elif isinstance(a.type, warp.types.array) and isinstance(a.type.dtype, Struct):
@@ -195,7 +248,7 @@ class Adjoint:
         arg_strs = []
 
         for a in args:
-            if isinstance(a, warp.context.Function):
+            if isinstance(a, Function):
                 # functions don't have a var_ prefix so strip it off here
                 if prefix == "var":
                     arg_strs.append(a.key)
@@ -211,8 +264,8 @@ class Adjoint:
         return arg_strs
 
     # generates argument string for a forward function call
-    def format_forward_call_args(adj, args, use_initializer_list):
-        arg_str = ", ".join(adj.format_args("var", args))
+    def format_forward_call_args(self, args, use_initializer_list):
+        arg_str = ", ".join(self.format_args("var", args))
         if use_initializer_list:
             return f"{{{arg_str}}}"
         return arg_str
