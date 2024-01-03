@@ -4,6 +4,9 @@
 #  personal capacity and am not conveying any rights to any intellectual
 #  property of any third parties.
 
+from warp.codegen.struct import Struct
+
+
 class Var:
     def __init__(self, label, type, requires_grad=False, constant=None, prefix=True):
         # convert built-in types to wp types

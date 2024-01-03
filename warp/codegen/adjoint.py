@@ -7,7 +7,31 @@
 import ast
 import inspect
 import textwrap
-from typing import List
+from typing import List, Any, Callable
+
+from warp.codegen.block import Block
+from warp.codegen.reference import is_reference, Reference
+from warp.codegen.var import Var
+
+
+class WarpCodegenError(RuntimeError):
+    def __init__(self, message):
+        super().__init__(message)
+
+
+class WarpCodegenTypeError(TypeError):
+    def __init__(self, message):
+        super().__init__(message)
+
+
+class WarpCodegenAttributeError(AttributeError):
+    def __init__(self, message):
+        super().__init__(message)
+
+
+class WarpCodegenKeyError(KeyError):
+    def __init__(self, message):
+        super().__init__(message)
 
 
 class Adjoint:
