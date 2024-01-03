@@ -9,6 +9,7 @@ import hashlib
 import os
 
 from warp import config
+from warp.codegen.struct import Struct
 
 
 class ModuleBuilder:
@@ -33,7 +34,7 @@ class ModuleBuilder:
                 for k in kernel.overloads.values():
                     self.build_kernel(k)
 
-    def build_struct_recursive(self, struct: warp.codegen.Struct):
+    def build_struct_recursive(self, struct: Struct):
         structs = []
 
         stack = [struct]
@@ -43,9 +44,9 @@ class ModuleBuilder:
             structs.append(s)
 
             for var in s.vars.values():
-                if isinstance(var.type, warp.codegen.Struct):
+                if isinstance(var.type, Struct):
                     stack.append(var.type)
-                elif isinstance(var.type, warp.types.array) and isinstance(var.type.dtype, warp.codegen.Struct):
+                elif isinstance(var.type, warp.types.array) and isinstance(var.type.dtype, Struct):
                     stack.append(var.type.dtype)
 
         # Build them in reverse to generate a correct dependency order.

@@ -12,7 +12,9 @@ from warp.codegen.adjoint import Adjoint
 
 # caches source and compiled entry points for a kernel (will be populated after module loads)
 class Kernel:
-    def __init__(self, func, key=None, module=None, options=None, code_transformers=[]):
+    def __init__(self, func, key=None, module=None, options=None, code_transformers=None):
+        if code_transformers is None:
+            code_transformers = []
         self.func = func
 
         if module is None:

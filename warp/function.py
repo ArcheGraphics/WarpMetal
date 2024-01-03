@@ -3,6 +3,11 @@
 #  I am making my contributions/submissions to this project solely in my
 #  personal capacity and am not conveying any rights to any intellectual
 #  property of any third parties.
+from typing import Any, Callable, Tuple
+from copy import copy as shallowcopy
+
+from warp.codegen.adjoint import Adjoint
+
 
 class Function:
     def __init__(
@@ -33,9 +38,11 @@ class Function:
             custom_reverse_num_input_args=-1,
             custom_reverse_mode=False,
             overloaded_annotations=None,
-            code_transformers=[],
+            code_transformers=None,
             skip_adding_overload=False,
     ):
+        if code_transformers is None:
+            code_transformers = []
         self.func = func  # points to Python function decorated with @wp.func, may be None for builtins
         self.key = key
         self.namespace = namespace
@@ -81,7 +88,7 @@ class Function:
             self.user_overloads = {}
 
             # user defined (Python) function
-            self.adj = warp.codegen.Adjoint(
+            self.adj = Adjoint(
                 func,
                 is_user_function=True,
                 skip_forward_codegen=skip_forward_codegen,
@@ -163,7 +170,7 @@ class Function:
 
         return "_".join([name, *types])
 
-    def add_overload(self, f):
+    def add_overload(self, f: 'Function'):
         if self.is_builtin():
             # todo: note that it is an error to add two functions
             # with the exact same signature as this would cause compile
@@ -224,7 +231,7 @@ class Function:
                     overload_annotations = dict(zip(arg_names, arg_types))
 
                     ovl = shallowcopy(f)
-                    ovl.adj = warp.codegen.Adjoint(f.func, overload_annotations)
+                    ovl.adj = Adjoint(f.func, overload_annotations)
                     ovl.input_types = overload_annotations
                     ovl.value_func = None
 
