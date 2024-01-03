@@ -3,14 +3,16 @@
 #  I am making my contributions/submissions to this project solely in my
 #  personal capacity and am not conveying any rights to any intellectual
 #  property of any third parties.
-
+import ast
 import ctypes
 import hashlib
 import os
 from typing import Mapping, Any
 
-from warp import config
+from warp import config, types
 from warp.codegen.struct import Struct
+from warp.module.function import Function
+from warp.module.kernel_hooks import KernelHooks
 
 
 class ModuleBuilder:
@@ -47,7 +49,7 @@ class ModuleBuilder:
             for var in s.vars.values():
                 if isinstance(var.type, Struct):
                     stack.append(var.type)
-                elif isinstance(var.type, warp.types.array) and isinstance(var.type.dtype, Struct):
+                elif isinstance(var.type, types.array) and isinstance(var.type.dtype, Struct):
                     stack.append(var.type.dtype)
 
         # Build them in reverse to generate a correct dependency order.
@@ -211,12 +213,12 @@ class Module:
             # already been registered. If so, then we simply override it, as
             # Python would do it, otherwise we register it as a new overload.
             func_existing = self.functions[func.key]
-            sig = warp.types.get_signature(
+            sig = types.get_signature(
                 func.input_types.values(),
                 func_name=func.key,
                 arg_names=list(func.input_types.keys()),
             )
-            sig_existing = warp.types.get_signature(
+            sig_existing = types.get_signature(
                 func_existing.input_types.values(),
                 func_name=func_existing.key,
                 arg_names=list(func_existing.input_types.keys()),
@@ -252,7 +254,7 @@ class Module:
                     func, _ = adj.resolve_static_expression(node.func, eval_types=False)
 
                     # if this is a user-defined function, add a module reference
-                    if isinstance(func, warp.context.Function) and func.module is not None:
+                    if isinstance(func, Function) and func.module is not None:
                         add_ref(func.module)
 
                 except Exception:
@@ -345,8 +347,8 @@ class Module:
             h.update(bytes(config.mode, "utf-8"))
 
             # compile-time constants (global)
-            if warp.types._constant_hash:
-                h.update(warp.types._constant_hash.digest())
+            if types._constant_hash:
+                h.update(types._constant_hash.digest())
 
             # recurse on references
             visited.add(module)

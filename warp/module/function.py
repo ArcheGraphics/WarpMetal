@@ -6,7 +6,15 @@
 from typing import Any, Callable, Tuple
 from copy import copy as shallowcopy
 
+from warp import types
 from warp.codegen.adjoint import Adjoint
+
+
+def create_value_func(type):
+    def value_func(args, kwds, templates):
+        return type
+
+    return value_func
 
 
 class Function:
@@ -117,7 +125,7 @@ class Function:
 
             # builtin (native) function, canonicalize argument types
             for k, v in input_types.items():
-                self.input_types[k] = warp.types.type_to_warp(v)
+                self.input_types[k] = types.type_to_warp(v)
 
             # cache mangled name
             if self.is_simple():
@@ -141,7 +149,7 @@ class Function:
 
         # only export simple types that don't use arrays
         for k, v in self.input_types.items():
-            if isinstance(v, warp.array) or v == Any or v == Callable or v == Tuple:
+            if isinstance(v, types.array) or v == Any or v == Callable or v == Tuple:
                 return False
 
         return_type = ""
@@ -184,12 +192,12 @@ class Function:
 
         else:
             # get function signature based on the input types
-            sig = warp.types.get_signature(
+            sig = types.get_signature(
                 f.input_types.values(), func_name=f.key, arg_names=list(f.input_types.keys())
             )
 
             # check if generic
-            if warp.types.is_generic_signature(sig):
+            if types.is_generic_signature(sig):
                 if sig in self.user_templates:
                     raise RuntimeError(
                         f"Duplicate generic function overload {self.key} with arguments {f.input_types.values()}"
@@ -205,7 +213,7 @@ class Function:
     def get_overload(self, arg_types):
         assert not self.is_builtin()
 
-        sig = warp.types.get_signature(arg_types, func_name=self.key)
+        sig = types.get_signature(arg_types, func_name=self.key)
 
         f = self.user_overloads.get(sig)
         if f is not None:
@@ -220,7 +228,7 @@ class Function:
                 args_matched = True
 
                 for i in range(len(arg_types)):
-                    if not warp.types.type_matches_template(arg_types[i], template_types[i]):
+                    if not types.type_matches_template(arg_types[i], template_types[i]):
                         args_matched = False
                         break
 
@@ -243,5 +251,5 @@ class Function:
             return None
 
     def __repr__(self):
-        inputs_str = ", ".join([f"{k}: {warp.types.type_repr(v)}" for k, v in self.input_types.items()])
+        inputs_str = ", ".join([f"{k}: {types.type_repr(v)}" for k, v in self.input_types.items()])
         return f"<Function {self.key}({inputs_str})>"
