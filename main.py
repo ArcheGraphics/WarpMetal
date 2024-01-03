@@ -1,4 +1,4 @@
-from warp2.module.context import func, kernel
+from warp import kernel
 
 
 @kernel

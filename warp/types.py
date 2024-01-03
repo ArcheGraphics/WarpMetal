@@ -23,7 +23,6 @@ import warp
 Length = TypeVar("Length", bound=int)
 Rows = TypeVar("Rows")
 Cols = TypeVar("Cols")
-DType = TypeVar("DType")
 
 Int = TypeVar("Int")
 Float = TypeVar("Float")
